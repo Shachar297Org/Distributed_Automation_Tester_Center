@@ -87,13 +87,14 @@ namespace Backend
         /// <summary>
         /// Connect to test center and register the reqested agent
         /// </summary>
-        /// <param name="url">agent URL</param>
+        /// <param name="agentUrl">agent URL</param>
         /// <returns>true/false if connection succeeded</returns>
-        public bool Connect(string url)
+        public bool Connect(string agentUrl)
         {
             Utils.LoadConfig();
             _logger = new Logger(Settings.Get("LOG_FILE_PATH"));
 
+            _logger.WriteLog($"Received agent connect from {agentUrl}.", "info");
             _agents = Utils.ReadAgentsFromFile(Settings.Get("AGENTS_PATH"));
 
             if (_agents.Count == 0)
@@ -101,14 +102,14 @@ namespace Backend
                 Init();
             }
 
-            _logger.WriteLog($"Agent {url} is connecting.", "info");
-            Agent agent = _agents.Find(a => a.URL == url);
+            _logger.WriteLog($"Agent {agentUrl} is connecting.", "info");
+            Agent agent = _agents.Find(a => a.URL == agentUrl);
             if (agent != null)
             {
                 return false;
             }
-            string[] urlStrings = url.Split(':');
-            _logger.WriteLog($"Adding agent {url} to pool.", "info");
+            string[] urlStrings = agentUrl.Split(':');
+            _logger.WriteLog($"Adding agent {agentUrl} to pool.", "info");
             _agents.Add(new Agent(urlStrings[0], int.Parse(urlStrings[1]), false));
             Utils.WriteAgentListToFile(_agents, Settings.Get("AGENTS_PATH"));
             return true;

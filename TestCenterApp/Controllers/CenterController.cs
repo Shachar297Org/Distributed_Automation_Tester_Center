@@ -11,8 +11,10 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Text;
+using System.Web;
 using System.Web.Http;
 using System.Web.Http.Results;
+
 
 namespace TestCenterApp.Controllers
 {
@@ -42,9 +44,9 @@ namespace TestCenterApp.Controllers
         public HttpResponseMessage Connect(int port)
         {
             int agentPort = port;
-            string agentIP = Request.RequestUri.Host.ToString();
-            string url = string.Join(":", agentIP, agentPort);
-            bool result = backEnd.Connect(url);
+            string agentIP = HttpContext.Current.Request.ServerVariables["REMOTE_ADDR"];
+            string agentUrl = string.Join(":", agentIP, agentPort);
+            bool result = backEnd.Connect(agentUrl);
 
             if (result)
             {
