@@ -35,9 +35,9 @@ namespace TestCenterApp
            );
 
             routes.MapRoute(
-                name: "GetScriptResults",
+                name: "GetActivationResults",
                 url: "{controller}/{action}/{id}",
-                defaults: new { controller = "Center", action = "GetScriptResults", id = UrlParameter.Optional },
+                defaults: new { controller = "Center", action = "GetActivationResults", id = UrlParameter.Optional },
                 constraints: new { httpMethod = new HttpMethodConstraint("POST") }
             );
 

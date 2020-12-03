@@ -32,7 +32,7 @@ namespace Console.Utilities
                 using (StreamReader reader = process.StandardOutput)
                 {
                     string output = reader.ReadToEnd();
-                    using (StreamWriter writer = new StreamWriter(outputFile))
+                    using (StreamWriter writer = new StreamWriter(outputFile, append: true))
                     {
                         writer.Write(output);
                     }

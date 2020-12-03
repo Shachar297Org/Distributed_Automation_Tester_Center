@@ -22,10 +22,14 @@ def CollectInstances(jsonFilePath: str):
 
 
 if __name__ == '__main__':
+    print('-----collect_aws_instances-----')
+    print('Arguments: {}'.format(sys.argv))
+
     try:
         jsonFilePath = sys.argv[1]
         CollectInstances(jsonFilePath)
+        print('-----success-----')
     except Exception as ex:
-        print(ex)
+        print('Error: {}'.format(ex))
+        print('-----fail-----')
         exit(1)
-    exit(0)

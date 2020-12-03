@@ -21,6 +21,9 @@ def SendScriptToAgents(agentRecords, scriptContent, configParser, logger):
 
 
 if __name__ == "__main__":
+    print('-----send_script-----')
+    print('Arguments: {}'.format(sys.argv))
+
     try:
         agentsFile = sys.argv[1]
         scriptFile = sys.argv[2]
@@ -40,7 +43,9 @@ if __name__ == "__main__":
         logger = InitLogger(configParser)
 
         SendScriptToAgents(agentRecords, scriptContent, configParser, logger)
+        print('-----success-----')
 
     except Exception as ex:
         print('Error: {}'.format(ex))
+        print('-----fail-----')
         exit(1)

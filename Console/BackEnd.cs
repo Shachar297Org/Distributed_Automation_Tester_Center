@@ -93,26 +93,37 @@ namespace Backend
         {
             Utils.LoadConfig();
             _logger = new Logger(Settings.Get("LOG_FILE_PATH"));
-
-            _logger.WriteLog($"Received agent connect from {agentUrl}.", "info");
-            _agents = Utils.ReadAgentsFromFile(Settings.Get("AGENTS_PATH"));
-
-            if (_agents.Count == 0)
+            try
             {
-                Init();
+                _logger.WriteLog($"Received agent connect from {agentUrl}.", "info");
+                _agents = Utils.ReadAgentsFromFile(Settings.Get("AGENTS_PATH"));
+
+                if (_agents.Count == 0)
+                {
+                    Init();
+                }
+
+                _logger.WriteLog($"Agent {agentUrl} is connecting.", "info");
+                Agent agent = _agents.Find(a => a.URL == agentUrl);
+                if (agent != null)
+                {
+                    return false;
+                }
+                if (Settings.Get("MODE").ToLower() == "debug")
+                {
+                    agentUrl = agentUrl.Replace("127.0.0.1", "localhost");
+                }
+                string[] urlStrings = agentUrl.Split(':');
+                _logger.WriteLog($"Adding agent {agentUrl} to pool.", "info");
+                _agents.Add(new Agent(urlStrings[0], int.Parse(urlStrings[1]), false));
+                Utils.WriteAgentListToFile(_agents, Settings.Get("AGENTS_PATH"));
+                return true;
             }
-
-            _logger.WriteLog($"Agent {agentUrl} is connecting.", "info");
-            Agent agent = _agents.Find(a => a.URL == agentUrl);
-            if (agent != null)
+            catch(Exception ex)
             {
+                _logger.WriteLog($"Error in connect: {ex.Message} {ex.StackTrace}", "error");
                 return false;
             }
-            string[] urlStrings = agentUrl.Split(':');
-            _logger.WriteLog($"Adding agent {agentUrl} to pool.", "info");
-            _agents.Add(new Agent(urlStrings[0], int.Parse(urlStrings[1]), false));
-            Utils.WriteAgentListToFile(_agents, Settings.Get("AGENTS_PATH"));
-            return true;
         }
 
         /// <summary>
@@ -123,16 +134,23 @@ namespace Backend
         {
             Utils.LoadConfig();
             _logger = new Logger(Settings.Get("LOG_FILE_PATH"));
-            _logger.WriteLog($"Received agent ready from {url}.", "info");
-            _agents = Utils.ReadAgentsFromFile(Settings.Get("AGENTS_PATH"));
-            Agent agent = _agents.Find(a => a.URL == url);
-            if (agent == null)
+            try
             {
-                _logger.WriteLog($"Agent {url} does not exist", "error");
-                throw new Exception("Agent does not exist.");
+                _logger.WriteLog($"Received agent ready from {url}.", "info");
+                _agents = Utils.ReadAgentsFromFile(Settings.Get("AGENTS_PATH"));
+                Agent agent = _agents.Find(a => a.URL == url);
+                if (agent == null)
+                {
+                    _logger.WriteLog($"Agent {url} does not exist", "error");
+                    throw new Exception("Agent does not exist.");
+                }
+                agent.IsReady = true;
+                Utils.WriteAgentListToFile(_agents, Settings.Get("AGENTS_PATH"));
             }
-            agent.IsReady = true;
-            Utils.WriteAgentListToFile(_agents, Settings.Get("AGENTS_PATH"));
+            catch (Exception ex)
+            {
+                _logger.WriteLog($"Error in agentReady: {ex.Message} {ex.StackTrace}", "error");
+            }
         }
 
         /// <summary>
@@ -183,13 +201,20 @@ namespace Backend
         /// <param name="devicesCsvFile">csv file containing devices to insert</param>
         private void InsertDevicesToPortal(string env, string devicesCsvFile)
         {
-            _logger.WriteLog("Insert devices to portal.", "info");
-            string pythonScriptsFolder = Settings.Get("PYTHON_SCRIPTS_PATH");
-            string pythonExePath = Settings.Get("PYTHON");
-            _logger.WriteLog($"Python scripts folder: {pythonScriptsFolder}, devices csv: {devicesCsvFile}", "info");
-            _logger.WriteLog($"Python exe path: {pythonExePath}", "info");
-            int returnCode = Utils.RunCommand(pythonExePath, "insert_devices.py", $"{env} {devicesCsvFile}", pythonScriptsFolder, Settings.Get("OUTPUT"));
-            Utils.WriteToFile(Settings.Get("RETURN_CODE"), returnCode.ToString(), false);
+            try
+            {
+                _logger.WriteLog("Insert devices to portal.", "info");
+                string pythonScriptsFolder = Settings.Get("PYTHON_SCRIPTS_PATH");
+                string pythonExePath = Settings.Get("PYTHON");
+                _logger.WriteLog($"Python scripts folder: {pythonScriptsFolder}, devices csv: {devicesCsvFile}", "info");
+                _logger.WriteLog($"Python exe path: {pythonExePath}", "info");
+                int returnCode = Utils.RunCommand(pythonExePath, "insert_devices.py", $"{env} {devicesCsvFile}", pythonScriptsFolder, Settings.Get("OUTPUT"));
+                Utils.WriteToFile(Settings.Get("RETURN_CODE"), returnCode.ToString(), false);
+            }
+            catch (Exception ex)
+            {
+                _logger.WriteLog($"Error in insertDevices: {ex.Message} {ex.StackTrace}", "error");
+            }
         }
 
         /// <summary>
@@ -197,9 +222,16 @@ namespace Backend
         /// </summary>
         private void DistributeDevicesAmongAgents()
         {
-            _logger.WriteLog($"Distribute device among agents.", "info");
-            int returnCode = Utils.RunCommand(Settings.Get("PYTHON"), "distribute_devices.py", $"{Settings.Get("DEVICES_PATH")} {Settings.Get("AGENTS_PATH")}", Settings.Get("PYTHON_SCRIPTS_PATH"), Settings.Get("OUTPUT"));
-            Utils.WriteToFile(Settings.Get("RETURN_CODE"), returnCode.ToString(), false);
+            try
+            {
+                _logger.WriteLog($"Distribute device among agents.", "info");
+                int returnCode = Utils.RunCommand(Settings.Get("PYTHON"), "distribute_devices.py", $"{Settings.Get("DEVICES_PATH")} {Settings.Get("AGENTS_PATH")}", Settings.Get("PYTHON_SCRIPTS_PATH"), Settings.Get("OUTPUT"));
+                Utils.WriteToFile(Settings.Get("RETURN_CODE"), returnCode.ToString(), false);
+            }
+            catch (Exception ex)
+            {
+                _logger.WriteLog($"Error in distributeDevices: {ex.Message} {ex.StackTrace}", "error");
+            }
         }
 
         /// <summary>
@@ -207,9 +239,16 @@ namespace Backend
         /// </summary>
         private void SendAutomationScript()
         {
-            _logger.WriteLog("Send automation script to agents.", "info");
-            int returnCode = Utils.RunCommand(Settings.Get("PYTHON"), "send_script.py", $"{Settings.Get("AGENTS_PATH")} {Settings.Get("ACTIVATION_SCRIPT_PATH")}", Settings.Get("PYTHON_SCRIPTS_PATH"), Settings.Get("OUTPUT"));
-            Utils.WriteToFile(Settings.Get("RETURN_CODE"), returnCode.ToString(), false);  
+            try
+            {
+                _logger.WriteLog("Send automation script to agents.", "info");
+                int returnCode = Utils.RunCommand(Settings.Get("PYTHON"), "send_script.py", $"{Settings.Get("AGENTS_PATH")} {Settings.Get("ACTIVATION_SCRIPT_PATH")}", Settings.Get("PYTHON_SCRIPTS_PATH"), Settings.Get("OUTPUT"));
+                Utils.WriteToFile(Settings.Get("RETURN_CODE"), returnCode.ToString(), false);
+            }
+            catch (Exception ex)
+            {
+                _logger.WriteLog($"Error in sendAutomationScript: {ex.Message} {ex.StackTrace}", "error");
+            }
         }
 
         /// <summary>

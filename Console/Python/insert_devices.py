@@ -141,24 +141,35 @@ def InsertDevices(env: str, deviceRecords: dict, configParser: object, logger: o
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
-        print('Enter 2 arguments: env and csv file')
+    print('-----insert_devices-----')
+    print('Arguments: {}'.format(sys.argv))
+
+    try:
+        if len(sys.argv) != 3:
+            print('Enter 2 arguments: env and csv file')
+            exit(1)
+
+        env = sys.argv[1]
+        csvFile = sys.argv[2]
+        print('arg 1: env: {}'.format(env))
+        print('arg 2: Csv file: {}'.format(csvFile))
+
+        if not os.path.exists(csvFile):
+            print('Csv file {} not exist'.format(csvFile))
+            exit(2)
+
+        configParser = LoadConfig()
+        logger = InitLogger(configParser)
+
+        portalDeviceRecords = CollectDevicesFromPortal(configParser, logger)
+        csvDeviceRecords = ReadRecordsFromCsvFile(csvFile)
+        deltaDevices = GetDeltaDevices(csvDeviceRecords, portalDeviceRecords)
+
+        InsertDevices(env, deltaDevices, configParser, logger)
+
+        print('-----success-----')
+
+    except Exception as ex:
+        print('Error: {}'.format(ex))
+        print('-----fail-----')
         exit(1)
-
-    env = sys.argv[1]
-    csvFile = sys.argv[2]
-    print('arg 1: env: '.format(env))
-    print('arg 2: Csv file: '.format(csvFile))
-
-    if not os.path.exists(csvFile):
-        print('Csv file {} not exist'.format(csvFile))
-        exit(2)
-
-    configParser = LoadConfig()
-    logger = InitLogger(configParser)
-
-    portalDeviceRecords = CollectDevicesFromPortal(configParser, logger)
-    csvDeviceRecords = ReadRecordsFromCsvFile(csvFile)
-    deltaDevices = GetDeltaDevices(csvDeviceRecords, portalDeviceRecords)
-
-    InsertDevices(env, deltaDevices, configParser, logger)

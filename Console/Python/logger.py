@@ -10,21 +10,18 @@ class Logger:
 
     def WriteDebug(self, msg: str):
         logging.debug(msg)
-        print(msg)
 
     def WriteInfo(self, msg: str):
         logging.info(msg)
-        print(msg)
 
     def WriteWarning(self, msg: str):
         logging.warning(msg)
-        print(msg)
 
     def WriteError(self, msg):
         logging.warning(msg)
-        print(msg)
 
     def WriteLog(self, msg: str, level: str):
+        print('[{}: {}]'.format(level.upper(), msg))
         if level == 'debug':
             self.WriteDebug(msg)
         elif level == 'info':

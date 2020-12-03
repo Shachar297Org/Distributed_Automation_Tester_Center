@@ -70,7 +70,7 @@ namespace TestCenterApp.Controllers
         public HttpResponseMessage AgentReady(string port)
         {
             string agentPort = port;
-            string agentIP = Request.RequestUri.Host.ToString();
+            string agentIP = HttpContext.Current.Request.ServerVariables["REMOTE_ADDR"];
             string url = string.Join(":", agentIP, agentPort);
             try
             {
@@ -91,16 +91,15 @@ namespace TestCenterApp.Controllers
 
         // POST: getScriptResults
         [HttpPost]
-        [Route("getScriptResults")]
-        public HttpResponseMessage GetScriptResults()
+        [Route("getActivationResults")]
+        public HttpResponseMessage GetActivationResults()
         {
-            string url = Request.RequestUri.AbsoluteUri;
-            string agentIP = Request.RequestUri.Host.ToString();
+            string agentIP = HttpContext.Current.Request.ServerVariables["REMOTE_ADDR"];
             HttpContent requestContent = Request.Content;
             try
             {
                 string content = requestContent.ReadAsStringAsync().Result;
-                Utils.WriteToFile(Settings.Get("SCRIPT_RESULTS_PATH"), content, false);
+                Utils.WriteToFile(Settings.Get("ACTIVATION_RESULTS_PATH"), content, false);
                 string msg = "Script results were received";
                 var response = Request.CreateResponse(HttpStatusCode.OK);
                 response.Content = new StringContent(("{result:" + msg + "}"), Encoding.UTF8, "application/json");
@@ -120,8 +119,7 @@ namespace TestCenterApp.Controllers
         [Route("getComparisonResults")]
         public HttpResponseMessage GetComparisonResults()
         {
-            string url = Request.RequestUri.AbsoluteUri;
-            string agentIP = Request.RequestUri.Host.ToString();
+            string agentIP = HttpContext.Current.Request.ServerVariables["REMOTE_ADDR"];
             HttpContent requestContent = Request.Content;
             try
             {
