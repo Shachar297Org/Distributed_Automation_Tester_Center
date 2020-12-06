@@ -36,8 +36,6 @@ def DistributeDevices(deviceRecords, agentRecords):
                 'Agent {} received device list'.format(agentRec['URL']))
         else:
             print('Error occured: {}'.format(r))
-            return False
-    return True
 
 
 if __name__ == "__main__":
@@ -62,13 +60,9 @@ if __name__ == "__main__":
         agentRecords = ReadRecordsFromJsonFile(agentsFile)
 
         print('Distribute devices to agents')
-        result = DistributeDevices(deviceRecords, agentRecords)
-        if result:
-            print('-----success-----')
-            exit(0)
-        else:
-            print('-----success-----')
-            exit(1)
+        DistributeDevices(deviceRecords, agentRecords)
+
+        print('-----success-----')
 
     except Exception as ex:
         print('Error: {}'.format(ex))

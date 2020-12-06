@@ -5,13 +5,15 @@ from utils import *
 
 
 def SendScriptToAgent(agentRec, scriptContent, configParser, logger):
-    logger.WriteLog(
-        'Sending activation script to agent-{}'.format(agentRec['AgentPort']), 'info')
+    print(
+        'Sending activation script to agent {}'.format(agentRec['URL']), 'info')
     r = requests.post(
         url='http://{}:{}/sendScript'.format(agentRec['AgentIP'], agentRec['AgentPort']), json={'Type': 'txt', 'Content': scriptContent})
     if r.status_code == 200:
-        logger.WriteLog('Script was recieved at agent {}:{}'.format(
-            agentRec['AgentIP'], agentRec['AgentPort']), 'info')
+        print('Script was recieved at agent {}'.format(
+            agentRec['URL']), 'info')
+    else:
+        print('Error: {}: {}'.format(r.status_code, r.reason))
 
 
 def SendScriptToAgents(agentRecords, scriptContent, configParser, logger):

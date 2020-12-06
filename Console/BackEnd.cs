@@ -136,6 +136,11 @@ namespace Backend
             _logger = new Logger(Settings.Get("LOG_FILE_PATH"));
             try
             {
+                if (Settings.Get("MODE").ToLower() == "debug")
+                {
+                    url = url.Replace("127.0.0.1", "localhost");
+                }
+
                 _logger.WriteLog($"Received agent ready from {url}.", "info");
                 _agents = Utils.ReadAgentsFromFile(Settings.Get("AGENTS_PATH"));
                 Agent agent = _agents.Find(a => a.URL == url);
@@ -160,6 +165,10 @@ namespace Backend
         /// <returns>true/false if operation succeeds</returns>
         public void GetScriptResults(string url)
         {
+            if (Settings.Get("MODE").ToLower() == "debug")
+            {
+                url = url.Replace("127.0.0.1", "localhost");
+            }
         }
 
         /// <summary>
@@ -168,7 +177,11 @@ namespace Backend
         /// <param name="url">agent url</param>
         /// <returns>true/false if operation succeeds</returns>
         public void GetComparisonResults(string url)
-        {  
+        {
+            if (Settings.Get("MODE").ToLower() == "debug")
+            {
+                url = url.Replace("127.0.0.1", "localhost");
+            }
         }
 
         /// <summary>
