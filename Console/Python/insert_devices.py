@@ -1,11 +1,3 @@
-import sys
-import requests
-import json
-import configparser
-from utils import *
-from logger import *
-from sql import *
-from record import *
 
 
 def ConnectRDS(host: str, db: str, username: str, password: str):
@@ -35,17 +27,17 @@ def GetDeviceEntries(dbConn: object):
     return resultsSet
 
 
-def CollectDevicesFromPortal(configParser, logger):
+def CollectDevicesFromPortal(config: object):
     """
     Collect devices list from the portal and return list of their records {GA, SN}
     """
-    host = configParser.get('RDSConnection', 'host')
-    db = configParser.get('RDSConnection', 'db')
-    username = configParser.get('RDSConnection', 'username')
-    password = configParser.get('RDSConnection', 'password')
+    host = config['RDS_HOST']
+    db = config['RDS_DB']
+    username = config['RDS_USER']
+    password = config['RDS_PASS']
 
     # Connect to RDS
-    simFlag = configParser.get('Debug', 'simulate')
+    simFlag = True if config['RDS_SIM'] == 'True' else False
     if simFlag:
         return [
             {'deviceType': 'GA-0000080CN', 'deviceSerialNumber': 'ELAD-TEST-1'},
@@ -71,48 +63,46 @@ def CollectDevicesFromPortal(configParser, logger):
         deviceRecords = []
         dbConn = ConnectRDS(host, db, username, password)
         if dbConn:
-            logger.WriteLog('Connected to RDS.', 'info')
+            print('Connected to RDS.')
             deviceEntries = GetDeviceEntries(dbConn)
             deviceRecords = [ConvertEntryToDeviceRecord(
                 entry) for entry in deviceEntries]
         else:
-            logger.WriteLog('Cannot connect to RDS.', 'error')
+            print('Error: Cannot connect to RDS.')
 
     return deviceRecords
 
 
-def SendRequestLogin(configParser: object, logger: object):
+def SendRequestLogin(config: object):
     """
     Sends to api host login request and return access token
     """
-    loginHost = configParser.get('api', 'login_host')
+    loginHost = config['API_LOGIN_HOST']
     loginData = {
-        "email": configParser.get('api', 'username'),
-        "password": configParser.get('api', 'password')
+        "email": config['API_USER'],
+        "password": config['API_PASS']
     }
     response = requests.post(
         url=loginHost, headers={'Content-Type': 'application/json'}, data=json.dumps(loginData))
     if not response.ok:
-        logger.WriteLog('Request failed. status code: {}'.format(
-            response.status_code), 'error')
+        print('Request failed. status code: {}'.format(response.status_code))
         return None
     jsonObj = response.json()
     return jsonObj['accessToken']
 
 
-def InsertDevice(accessToken: str, deviceRecord: dict, configParser: object, logger: object):
+def InsertDevice(accessToken: str, deviceRecord: dict, config: object):
     """
     Insert new device to portal using access token
     """
-    host = configParser.get('api', 'insert_device')
+    host = config['API_INSERT_DEVICE']
     response = requests.post(url=host, headers={'Content-Type': 'application/json', 'Authorization': 'Bearer {}'.format(
         accessToken)}, data=json.dumps({'createLumDeviceRequest': deviceRecord}))
     if response.ok:
-        logger.WriteLog('Device device {} was inserted successfully.'.format(
-            deviceRecord), 'info')
+        print('Device device {} was inserted successfully.'.format(deviceRecord))
     else:
-        logger.WriteLog('Error: cannot insert device {}. status code: {}. {}'.format(
-            deviceRecord, response.status_code, response.text), 'error')
+        print('Error: cannot insert device {}. status code: {}. {}'.format(
+            deviceRecord, response.status_code, response.text))
 
 
 def GetDeltaDevices(devicesList1, devicesList2):
@@ -126,46 +116,66 @@ def GetDeltaDevices(devicesList1, devicesList2):
     return deltaDevices
 
 
-def InsertDevices(env: str, deviceRecords: dict, configParser: object, logger: object):
+def InsertDevices(env: str, deviceRecords: dict, config: object):
     """
     Insert new devices from csv file to portal
     """
-    accessToken = SendRequestLogin(configParser, logger)
+    accessToken = SendRequestLogin(config)
     if not accessToken:
-        logger.WriteLog('Login failed.', 'error')
+        print('Error: Login failed.')
         return
-    logger.WriteLog('Login success.', 'info')
+    print('Login success.')
     for deviceRecord in deviceRecords:
-        logger.WriteLog('Inserting device: {}'.format(deviceRecord), 'info')
-        InsertDevice(accessToken, deviceRecord, configParser, logger)
+        print('Inserting device: {}'.format(deviceRecord))
+        InsertDevice(accessToken, deviceRecord, config)
 
 
 if __name__ == "__main__":
+    import os
+    curr_dir = os.getcwd()
+    activate_file = os.path.join(
+        curr_dir, 'env', 'Scripts', 'activate_this.py')
+    exec(open(activate_file).read(), {'__file__': activate_file})
+
+    import sys
+    import requests
+    import json
+    import configparser
+    from utils import *
+    from sql import *
+    from record import *
+
     print('-----insert_devices-----')
     print('Arguments: {}'.format(sys.argv))
 
     try:
-        if len(sys.argv) != 3:
-            print('Enter 2 arguments: env and csv file')
+        if len(sys.argv) != 2:
+            print('Enter 1 arguments: config file')
             exit(1)
 
-        env = sys.argv[1]
-        csvFile = sys.argv[2]
-        print('arg 1: env: {}'.format(env))
-        print('arg 2: Csv file: {}'.format(csvFile))
+        configFile = sys.argv[1]
+        print('arg 1: env: {}'.format(configFile))
 
-        if not os.path.exists(csvFile):
-            print('Csv file {} not exist'.format(csvFile))
+        if not os.path.exists(configFile):
+            print('Config file {} not exist'.format(configFile))
             exit(2)
 
-        configParser = LoadConfig()
-        logger = InitLogger(configParser)
+        config = LoadConfigText(configFile)
 
-        portalDeviceRecords = CollectDevicesFromPortal(configParser, logger)
-        csvDeviceRecords = ReadRecordsFromCsvFile(csvFile)
+        devicesCsvFile = config['DEVICES_PATH']
+        env = config['ENV']
+
+        print('Devices csv file: {}'.format(devicesCsvFile))
+        print('Env: {}'.format(env))
+
+        portalDeviceRecords = CollectDevicesFromPortal(config)
+
+        print('Devices: {}'.format(portalDeviceRecords))
+
+        csvDeviceRecords = ReadRecordsFromCsvFile(devicesCsvFile)
         deltaDevices = GetDeltaDevices(csvDeviceRecords, portalDeviceRecords)
 
-        InsertDevices(env, deltaDevices, configParser, logger)
+        InsertDevices(env, deltaDevices, config)
 
         print('-----success-----')
 

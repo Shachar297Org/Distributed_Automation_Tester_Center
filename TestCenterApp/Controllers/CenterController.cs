@@ -144,11 +144,11 @@ namespace TestCenterApp.Controllers
         public HttpResponseMessage TestCommand(string num)
         {
             Utils.LoadConfig();
-            string pythonPath = (Settings.Get("PYTHON"));
-            int returnCode = Utils.RunCommand(pythonPath, "pythonScript.py", num, @"D:\Temp", @"D:\test_center\out.txt");
-            var output = Utils.ReadFileContent(@"D:\test_center\out.txt");
+
+            string result = backEnd.TestCommand(num);
+
             var response = Request.CreateResponse(HttpStatusCode.OK);
-            var jsonText = "{returnCode:" + returnCode + ", " + "output:" + output + "}";
+            var jsonText = "{returnStatus:" + result + "}";
             response.Content = new StringContent(jsonText, Encoding.UTF8, "application/json");
             return response;
         }

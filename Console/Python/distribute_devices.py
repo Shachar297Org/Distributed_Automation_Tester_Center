@@ -1,7 +1,3 @@
-import os
-import sys
-import requests
-from utils import *
 
 
 def DivideDevicesAmongAgents(deviceRecords, agentRecords):
@@ -39,25 +35,35 @@ def DistributeDevices(deviceRecords, agentRecords):
 
 
 if __name__ == "__main__":
+    import os
+    curr_dir = os.getcwd()
+    activate_file = os.path.join(
+        curr_dir, 'env', 'Scripts', 'activate_this.py')
+    exec(open(activate_file).read(), {'__file__': activate_file})
+
+    import sys
+    import requests
+    from utils import *
+
     print('-----distribute_devices-----')
     print('Arguments: {}'.format(sys.argv))
 
     try:
-        devicesFile = sys.argv[1]
-        agentsFile = sys.argv[2]
+        configFile = sys.argv[1]
 
-        if not os.path.exists(devicesFile):
-            print('Error: the file {} does not exist'.format(devicesFile))
+        if not os.path.exists(configFile):
+            print('Error: the config file {} does not exist'.format(configFile))
             exit(2)
 
-        if not os.path.exists(agentsFile):
-            print('Error: the file {} does not exist'.format(agentsFile))
-            exit(2)
+        config = LoadConfigText(configFile)
+
+        devicesCsvFile = config['DEVICES_PATH']
+        agentsJsonFile = config['AGENTS_PATH']
 
         print('Read devices file')
-        deviceRecords = ReadRecordsFromCsvFile(devicesFile)
+        deviceRecords = ReadRecordsFromCsvFile(devicesCsvFile)
         print('Read agents file')
-        agentRecords = ReadRecordsFromJsonFile(agentsFile)
+        agentRecords = ReadRecordsFromJsonFile(agentsJsonFile)
 
         print('Distribute devices to agents')
         DistributeDevices(deviceRecords, agentRecords)

@@ -184,6 +184,19 @@ def LoadConfig():
     return configParser
 
 
+def LoadConfigText(configFile: str):
+    config = {}
+    with open(configFile, 'r') as reader:
+        lines = reader.readlines()
+        for line in lines:
+            if '=' in line:
+                line = line.strip(' \n')
+                fields = line.split('=')
+                key, value = fields[0], fields[1]
+                config[key] = value
+    return config
+
+
 def InitLogger(configParser: object):
     logFile = configParser.get('Logger', 'loggerFile')
     logger = Logger('Test-Center', logFile)

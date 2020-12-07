@@ -131,8 +131,10 @@ namespace Console.Utilities
 
         public static void LoadConfig()
         {
-            using (var streamReader = File.OpenText("D:/Config/test_center_config.txt"))
+            string configFilePath = "D:/Config/test_center_config.txt";
+            using (var streamReader = File.OpenText(configFilePath))
             {
+                Settings.settingsDict["CONFIG_FILE"] = configFilePath;
                 var lines = streamReader.ReadToEnd().Split("\r\n".ToCharArray(), StringSplitOptions.RemoveEmptyEntries);
                 foreach (string line in lines)
                 {

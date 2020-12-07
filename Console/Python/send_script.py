@@ -1,10 +1,6 @@
-import os
-import sys
-import requests
-from utils import *
 
 
-def SendScriptToAgent(agentRec, scriptContent, configParser, logger):
+def SendScriptToAgent(agentRec: dict, scriptContent: str):
     print(
         'Sending activation script to agent {}'.format(agentRec['URL']), 'info')
     r = requests.post(
@@ -16,35 +12,42 @@ def SendScriptToAgent(agentRec, scriptContent, configParser, logger):
         print('Error: {}: {}'.format(r.status_code, r.reason))
 
 
-def SendScriptToAgents(agentRecords, scriptContent, configParser, logger):
+def SendScriptToAgents(agentRecords: list, scriptContent: str):
     for agentRec in agentRecords:
         if agentRec['IsReady']:
-            SendScriptToAgent(agentRec, scriptContent, configParser, logger)
+            SendScriptToAgent(agentRec, scriptContent)
 
 
 if __name__ == "__main__":
+    import os
+    curr_dir = os.getcwd()
+    activate_file = os.path.join(
+        curr_dir, 'env', 'Scripts', 'activate_this.py')
+    exec(open(activate_file).read(), {'__file__': activate_file})
+
+    import sys
+    import requests
+    from utils import *
+
     print('-----send_script-----')
     print('Arguments: {}'.format(sys.argv))
 
     try:
-        agentsFile = sys.argv[1]
-        scriptFile = sys.argv[2]
+        configFile = sys.argv[1]
 
-        if not os.path.exists(agentsFile):
-            print('Error: the file {} does not exist'.format(agentsFile))
+        if not os.path.exists(configFile):
+            print('Error: the config file {} does not exist'.format(configFile))
             exit(2)
 
-        if not os.path.exists(scriptFile):
-            print('Error: the file {} does not exist'.format(scriptFile))
-            exit(2)
+        config = LoadConfigText(configFile)
+
+        agentsFile = config['AGENTS_PATH']
+        scriptFile = config['ACTIVATION_SCRIPT_PATH']
 
         agentRecords = ReadRecordsFromJsonFile(agentsFile)
         scriptContent = ReadContentFromFile(scriptFile)
 
-        configParser = LoadConfig()
-        logger = InitLogger(configParser)
-
-        SendScriptToAgents(agentRecords, scriptContent, configParser, logger)
+        SendScriptToAgents(agentRecords, scriptContent)
         print('-----success-----')
 
     except Exception as ex:

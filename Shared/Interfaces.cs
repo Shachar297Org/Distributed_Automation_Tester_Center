@@ -17,5 +17,7 @@ namespace Shared
         void GetComparisonResults(string url);
 
         bool Init();
+
+        string TestCommand(string num);
     }
 }

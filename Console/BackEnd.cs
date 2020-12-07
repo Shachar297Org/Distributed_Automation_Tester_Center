@@ -35,7 +35,8 @@ namespace Backend
                 _getAgentConnectTimer.Start();
 
                 InitAgents();
-                InsertDevicesToPortal(Settings.Get("ENV"), Settings.Get("DEVICES_PATH"));
+                InsertDevicesToPortal(Settings.Get("CONFIG_FILE"));
+                //InsertDevicesToPortal(Settings.Get("ENV"), Settings.Get("DEVICES_PATH"));
                 //CollectAWSServices(Settings.Get("ENV"));
                 //CollectAWSInstances();
                 return true;
@@ -212,16 +213,15 @@ namespace Backend
         /// </summary>
         /// <param name="env">env value (dev/staging/int)</param>
         /// <param name="devicesCsvFile">csv file containing devices to insert</param>
-        private void InsertDevicesToPortal(string env, string devicesCsvFile)
+        private void InsertDevicesToPortal(string configFile)
         {
             try
             {
                 _logger.WriteLog("Insert devices to portal.", "info");
                 string pythonScriptsFolder = Settings.Get("PYTHON_SCRIPTS_PATH");
                 string pythonExePath = Settings.Get("PYTHON");
-                _logger.WriteLog($"Python scripts folder: {pythonScriptsFolder}, devices csv: {devicesCsvFile}", "info");
                 _logger.WriteLog($"Python exe path: {pythonExePath}", "info");
-                int returnCode = Utils.RunCommand(pythonExePath, "insert_devices.py", $"{env} {devicesCsvFile}", pythonScriptsFolder, Settings.Get("OUTPUT"));
+                int returnCode = Utils.RunCommand(pythonExePath, "insert_devices.py", $"{configFile}", pythonScriptsFolder, Settings.Get("OUTPUT"));
                 Utils.WriteToFile(Settings.Get("RETURN_CODE"), returnCode.ToString(), false);
             }
             catch (Exception ex)
@@ -238,7 +238,7 @@ namespace Backend
             try
             {
                 _logger.WriteLog($"Distribute device among agents.", "info");
-                int returnCode = Utils.RunCommand(Settings.Get("PYTHON"), "distribute_devices.py", $"{Settings.Get("DEVICES_PATH")} {Settings.Get("AGENTS_PATH")}", Settings.Get("PYTHON_SCRIPTS_PATH"), Settings.Get("OUTPUT"));
+                int returnCode = Utils.RunCommand(Settings.Get("PYTHON"), "distribute_devices.py", $"{Settings.Get("CONFIG_FILE")}", Settings.Get("PYTHON_SCRIPTS_PATH"), Settings.Get("OUTPUT"));
                 Utils.WriteToFile(Settings.Get("RETURN_CODE"), returnCode.ToString(), false);
             }
             catch (Exception ex)
@@ -255,7 +255,7 @@ namespace Backend
             try
             {
                 _logger.WriteLog("Send automation script to agents.", "info");
-                int returnCode = Utils.RunCommand(Settings.Get("PYTHON"), "send_script.py", $"{Settings.Get("AGENTS_PATH")} {Settings.Get("ACTIVATION_SCRIPT_PATH")}", Settings.Get("PYTHON_SCRIPTS_PATH"), Settings.Get("OUTPUT"));
+                int returnCode = Utils.RunCommand(Settings.Get("PYTHON"), "send_script.py", $"{Settings.Get("CONFIG_FILE")}", Settings.Get("PYTHON_SCRIPTS_PATH"), Settings.Get("OUTPUT"));
                 Utils.WriteToFile(Settings.Get("RETURN_CODE"), returnCode.ToString(), false);
             }
             catch (Exception ex)
@@ -283,6 +283,27 @@ namespace Backend
             _logger.WriteLog("Collect AWS instances.", "info");
             int returnCode = Utils.RunCommand(Settings.Get("PYTHON"), "collect_aws_instances.py", $"{Settings.Get("AWS_INSTANCES_PATH")}", Settings.Get("PYTHON_SCRIPTS_PATH"), Settings.Get("OUTPUT"));
             Utils.WriteToFile(Settings.Get("RETURN_CODE"), returnCode.ToString(), false);
-        } 
+        }
+
+        public string TestCommand(string num)
+        {
+            Utils.LoadConfig();
+            _logger = new Logger(Settings.Get("LOG_FILE_PATH"));
+
+            try
+            {
+                string pythonPath = Settings.Get("PYTHON");
+                string pythonScriptsPath = Settings.Get("PYTHON_SCRIPTS_PATH");
+                int returnCode = Utils.RunCommand(pythonPath, "pythonScript.py", num, pythonScriptsPath, @"D:\test_center\out.txt");
+                var output = Utils.ReadFileContent(@"D:\test_center\out.txt");
+                return "success";
+            }
+
+            catch (Exception ex)
+            {
+                _logger.WriteLog($"Error: {ex.StackTrace}", "error");
+                return "fail";
+            }
+        }
     }
 }
