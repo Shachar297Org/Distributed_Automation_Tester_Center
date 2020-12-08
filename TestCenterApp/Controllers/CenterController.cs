@@ -91,15 +91,15 @@ namespace TestCenterApp.Controllers
 
         // POST: getScriptResults
         [HttpPost]
-        [Route("getActivationResults")]
-        public HttpResponseMessage GetActivationResults()
+        [Route("getScriptResults")]
+        public HttpResponseMessage GetScriptResults()
         {
             string agentIP = HttpContext.Current.Request.ServerVariables["REMOTE_ADDR"];
             HttpContent requestContent = Request.Content;
             try
             {
                 string content = requestContent.ReadAsStringAsync().Result;
-                Utils.WriteToFile(Settings.Get("ACTIVATION_RESULTS_PATH"), content, false);
+                backEnd.GetScriptResults(agentIP, content);
                 string msg = "Script results were received";
                 var response = Request.CreateResponse(HttpStatusCode.OK);
                 response.Content = new StringContent(("{result:" + msg + "}"), Encoding.UTF8, "application/json");
@@ -110,31 +110,6 @@ namespace TestCenterApp.Controllers
                 string msg = "Script results were received";
                 var response = Request.CreateResponse(HttpStatusCode.InternalServerError);
                 response.Content = new StringContent(("{result:" + msg + "}"), Encoding.UTF8, "application/json");
-                return response;
-            }
-        }
-
-        // POST: getComparisonResults
-        [HttpPost]
-        [Route("getComparisonResults")]
-        public HttpResponseMessage GetComparisonResults()
-        {
-            string agentIP = HttpContext.Current.Request.ServerVariables["REMOTE_ADDR"];
-            HttpContent requestContent = Request.Content;
-            try
-            {
-                string content = requestContent.ReadAsStringAsync().Result;
-                Utils.WriteToFile(Settings.Get("COMPARISON_RESULTS_PATH"), content, false);
-                string msg = "Comparison results were received";
-                var response = Request.CreateResponse(HttpStatusCode.OK);
-                response.Content = new StringContent(("{result: " + msg + "}"), Encoding.UTF8, "application/json");
-                return response;
-            }
-            catch (Exception ex)
-            {
-                string msg = ex.Message;
-                var response = Request.CreateResponse(HttpStatusCode.InternalServerError);
-                response.Content = new StringContent(("{result: " + msg + "}"), Encoding.UTF8, "application/json");
                 return response;
             }
         }

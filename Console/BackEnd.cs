@@ -1,6 +1,7 @@
 ﻿using Console;
 using Console.Models;
 using Console.Utilities;
+using Newtonsoft.Json;
 using Shared;
 using System;
 using System.Collections.Generic;
@@ -163,25 +164,63 @@ namespace Backend
         /// Get from agent report of script results and write them to file script_results.json
         /// </summary>
         /// <param name="url">agent url</param>
+        /// <param name="content">Response content</param>
         /// <returns>true/false if operation succeeds</returns>
-        public void GetScriptResults(string url)
+        public void GetScriptResults(string url, string content)
         {
-            if (Settings.Get("MODE").ToLower() == "debug")
+            Utils.LoadConfig();
+            _logger = new Logger(Settings.Get("LOG_FILE_PATH"));
+            try
             {
-                url = url.Replace("127.0.0.1", "localhost");
-            }
-        }
+                if (Settings.Get("MODE").ToLower() == "debug")
+                {
+                    url = url.Replace("127.0.0.1", "localhost");
+                }
+                Utils.WriteToFile(Settings.Get("SCRIPT_RESULTS_PATH"), content, false);
+                List<Event> events = JsonConvert.DeserializeObject<List<Event>>(content);
+                string deviceResultsDir= Settings.Get("DEVICE_RESULTS_DIR");
+                if (!Directory.Exists(deviceResultsDir))
+                {
+                    Directory.CreateDirectory(deviceResultsDir);
+                }
 
-        /// <summary>
-        /// Get from agent report of comparison results
-        /// </summary>
-        /// <param name="url">agent url</param>
-        /// <returns>true/false if operation succeeds</returns>
-        public void GetComparisonResults(string url)
-        {
-            if (Settings.Get("MODE").ToLower() == "debug")
+                Dictionary<string, List<Event>> deviceResultsDict = new Dictionary<string, List<Event>>();
+
+                // Initialize dictionary of <deviceName, eventsList>
+                foreach (Event eventObj in events)
+                {
+                    string ga = eventObj.DeviceType;
+                    string sn = eventObj.DeviceSerialNumber;
+                    string deviceName = string.Join("_", new string[] { sn, ga });
+                    deviceResultsDict[deviceName] = new List<Event>();
+                }
+
+                // Fill dictionary of <deviceName, eventsList>
+                foreach (Event eventObj in events)
+                {
+                    string ga = eventObj.DeviceType;
+                    string sn = eventObj.DeviceSerialNumber;
+                    string eventKey = eventObj.EventKey;
+                    string eventValue = eventObj.EventValue;
+                    DateTime creationTime = eventObj.CreationTime;
+                    string deviceName = string.Join("_", new string[] { sn, ga });
+                    deviceResultsDict[deviceName].Add(eventObj);
+                }
+
+                // Create json files
+                foreach (string deviceName in deviceResultsDict.Keys)
+                {
+                    string deviceFolderPath = Path.Combine(deviceResultsDir, deviceName);
+                    Directory.CreateDirectory(deviceFolderPath);
+                    string jsonContentByDevice = JsonConvert.SerializeObject(deviceResultsDict[deviceName]);
+                    string jsonFileByDevice = Path.Combine(deviceResultsDir, deviceName, deviceName + ".json");
+                    Utils.WriteToFile(jsonFileByDevice, jsonContentByDevice, append: false);
+                }
+
+            }
+            catch (Exception ex)
             {
-                url = url.Replace("127.0.0.1", "localhost");
+                _logger.WriteLog($"{ex.Message} {ex.StackTrace}", "error");
             }
         }
 
