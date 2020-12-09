@@ -160,13 +160,7 @@ namespace Backend
             }
         }
 
-        /// <summary>
-        /// Get from agent report of script results and write them to file script_results.json
-        /// </summary>
-        /// <param name="url">agent url</param>
-        /// <param name="content">Response content</param>
-        /// <returns>true/false if operation succeeds</returns>
-        public void GetScriptResults(string url, string content)
+        public void GetComparisonResults(string url, string jsonContent)
         {
             Utils.LoadConfig();
             _logger = new Logger(Settings.Get("LOG_FILE_PATH"));
@@ -176,9 +170,10 @@ namespace Backend
                 {
                     url = url.Replace("127.0.0.1", "localhost");
                 }
-                Utils.WriteToFile(Settings.Get("SCRIPT_RESULTS_PATH"), content, false);
-                List<Event> events = JsonConvert.DeserializeObject<List<Event>>(content);
-                string deviceResultsDir= Settings.Get("DEVICE_RESULTS_DIR");
+
+                List<Event> events = JsonConvert.DeserializeObject<List<Event>>(jsonContent);
+
+                string deviceResultsDir = Settings.Get("DEVICE_RESULTS_DIR");
                 if (!Directory.Exists(deviceResultsDir))
                 {
                     Directory.CreateDirectory(deviceResultsDir);
@@ -217,6 +212,43 @@ namespace Backend
                     Utils.WriteToFile(jsonFileByDevice, jsonContentByDevice, append: false);
                 }
 
+            }
+            catch (Exception ex)
+            {
+                _logger.WriteLog($"{ex.Message} {ex.StackTrace}", "error");
+            }
+        }
+
+        /// <summary>
+        /// Get from agent report of script log and write them to file <deviceName>_log.txt
+        /// </summary>
+        /// <param name="url">agent url</param>
+        /// <param name="content">Response content</param>
+        /// <returns>true/false if operation succeeds</returns>
+        public void GetScriptLog(string url, string jsonContent)
+        {
+            Utils.LoadConfig();
+            _logger = new Logger(Settings.Get("LOG_FILE_PATH"));
+            try
+            {
+                if (Settings.Get("MODE").ToLower() == "debug")
+                {
+                    url = url.Replace("127.0.0.1", "localhost");
+                }
+
+                string deviceLogsDir = Settings.Get("DEVICE_LOGS_DIR");
+                if (!Directory.Exists(deviceLogsDir))
+                {
+                    Directory.CreateDirectory(deviceLogsDir);
+                }
+
+                ScriptLog scriptLogObj = JsonConvert.DeserializeObject<ScriptLog>(jsonContent);
+                string deviceName = scriptLogObj.DeviceName;
+                string logContent = scriptLogObj.Content;
+
+                string logFilePath = Path.Combine(deviceLogsDir, deviceName + "_log.txt");
+
+                Utils.WriteToFile(logFilePath, logContent, append: false);
             }
             catch (Exception ex)
             {

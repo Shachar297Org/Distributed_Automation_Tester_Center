@@ -12,7 +12,9 @@ namespace Shared
 
         void AgentReady(string url);
 
-        void GetScriptResults(string url, string content);
+        void GetScriptLog(string url, string jsonContent);
+
+        void GetComparisonResults(string url, string jsonContent);
 
         bool Init();
 

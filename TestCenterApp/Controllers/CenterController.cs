@@ -89,25 +89,50 @@ namespace TestCenterApp.Controllers
             }
         }
 
-        // POST: getScriptResults
+        // POST: getScriptLog
         [HttpPost]
-        [Route("getScriptResults")]
-        public HttpResponseMessage GetScriptResults()
+        [Route("getScriptLog")]
+        public HttpResponseMessage GetScriptLog()
         {
             string agentIP = HttpContext.Current.Request.ServerVariables["REMOTE_ADDR"];
             HttpContent requestContent = Request.Content;
             try
             {
-                string content = requestContent.ReadAsStringAsync().Result;
-                backEnd.GetScriptResults(agentIP, content);
-                string msg = "Script results were received";
+                string jsonContent = requestContent.ReadAsStringAsync().Result;
+                backEnd.GetScriptLog(agentIP, jsonContent);
+                string msg = "Script log was received";
                 var response = Request.CreateResponse(HttpStatusCode.OK);
                 response.Content = new StringContent(("{result:" + msg + "}"), Encoding.UTF8, "application/json");
                 return response;
             }
             catch (Exception)
             {
-                string msg = "Script results were received";
+                string msg = "Script log was not received";
+                var response = Request.CreateResponse(HttpStatusCode.InternalServerError);
+                response.Content = new StringContent(("{result:" + msg + "}"), Encoding.UTF8, "application/json");
+                return response;
+            }
+        }
+
+        // POST: getComparisonResults
+        [HttpPost]
+        [Route("getComparisonResults")]
+        public HttpResponseMessage GetComparisonResults()
+        {
+            string agentIP = HttpContext.Current.Request.ServerVariables["REMOTE_ADDR"];
+            HttpContent requestContent = Request.Content;
+            try
+            {
+                string jsonContent = requestContent.ReadAsStringAsync().Result;
+                backEnd.GetComparisonResults(agentIP, jsonContent);
+                string msg = "Comparison results were received";
+                var response = Request.CreateResponse(HttpStatusCode.OK);
+                response.Content = new StringContent(("{result:" + msg + "}"), Encoding.UTF8, "application/json");
+                return response;
+            }
+            catch (Exception)
+            {
+                string msg = "Comparison results were not received";
                 var response = Request.CreateResponse(HttpStatusCode.InternalServerError);
                 response.Content = new StringContent(("{result:" + msg + "}"), Encoding.UTF8, "application/json");
                 return response;
