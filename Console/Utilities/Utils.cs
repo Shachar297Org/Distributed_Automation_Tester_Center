@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json;
+﻿using Console.Models;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Configuration;
@@ -141,6 +142,18 @@ namespace Console.Utilities
                     string[] fields = line.Split('=');
                     Settings.settingsDict[fields[0]] = fields[1];
                 }
+            }
+        }
+
+        public static void WriteRecordsToCsv(string csvFileByDevice, List<Event> events)
+        {
+            using (StreamWriter writer = new StreamWriter(csvFileByDevice))
+            {
+                writer.WriteLine($"SerialNumber,DeviceType,EventKey,EventValue,CreationTime");
+                foreach (Event e in events)
+                {
+                    writer.WriteLine($"{e.EventDeviceSerialNumber},{e.EventDeviceType},{e.EventKey},{e.EventValue},{e.CreationTime}");
+                }     
             }
         }
     }

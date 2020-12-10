@@ -6,9 +6,9 @@ namespace Console.Models
 {
     public class Event
     {
-        public string DeviceType { get; set; }
+        public string EventDeviceType { get; set; }
 
-        public string DeviceSerialNumber { get; set; }
+        public string EventDeviceSerialNumber { get; set; }
 
         public string EventKey { get; set; }
 

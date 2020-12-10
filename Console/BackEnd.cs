@@ -72,7 +72,7 @@ namespace Backend
             _getAgentConnectTimer.Stop();
             DistributeDevicesAmongAgents();
             _logger.WriteLog($"Starting agent ready timer", "info");
-            _getAgentReadyTimer.Start();
+            _getAgentReadyTimer.Start(); // todo: do it after the first getReady message recieved
         }
 
         /// <summary>
@@ -184,8 +184,8 @@ namespace Backend
                 // Initialize dictionary of <deviceName, eventsList>
                 foreach (Event eventObj in events)
                 {
-                    string ga = eventObj.DeviceType;
-                    string sn = eventObj.DeviceSerialNumber;
+                    string ga = eventObj.EventDeviceType;
+                    string sn = eventObj.EventDeviceSerialNumber;
                     string deviceName = string.Join("_", new string[] { sn, ga });
                     deviceResultsDict[deviceName] = new List<Event>();
                 }
@@ -193,8 +193,8 @@ namespace Backend
                 // Fill dictionary of <deviceName, eventsList>
                 foreach (Event eventObj in events)
                 {
-                    string ga = eventObj.DeviceType;
-                    string sn = eventObj.DeviceSerialNumber;
+                    string ga = eventObj.EventDeviceType;
+                    string sn = eventObj.EventDeviceSerialNumber;
                     string eventKey = eventObj.EventKey;
                     string eventValue = eventObj.EventValue;
                     DateTime creationTime = eventObj.CreationTime;
@@ -208,10 +208,10 @@ namespace Backend
                     string deviceFolderPath = Path.Combine(deviceResultsDir, deviceName);
                     Directory.CreateDirectory(deviceFolderPath);
                     string jsonContentByDevice = JsonConvert.SerializeObject(deviceResultsDict[deviceName]);
-                    string jsonFileByDevice = Path.Combine(deviceResultsDir, deviceName, deviceName + ".json");
-                    Utils.WriteToFile(jsonFileByDevice, jsonContentByDevice, append: false);
+                    string csvFileByDevice = Path.Combine(deviceResultsDir, deviceName, deviceName + ".csv");
+                    //Utils.WriteToFile(jsonFileByDevice, jsonContentByDevice, append: false);
+                    Utils.WriteRecordsToCsv(csvFileByDevice, deviceResultsDict[deviceName]);
                 }
-
             }
             catch (Exception ex)
             {
