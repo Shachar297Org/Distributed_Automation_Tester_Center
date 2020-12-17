@@ -12,7 +12,7 @@ namespace Backend
     public class BackEnd : IBackEndInterfaces
     {
         System.Timers.Timer _getAgentConnectTimer = new System.Timers.Timer(new TimeSpan(0, 0, 30).TotalMilliseconds);
-        System.Timers.Timer _getAgentReadyTimer = new System.Timers.Timer(new TimeSpan(0, 0, 30).TotalMilliseconds);
+        System.Timers.Timer _getAgentReadyTimer = new System.Timers.Timer(new TimeSpan(0, 1, 0).TotalMilliseconds);
         List<Agent> _agents = null;
         List<Device> _devices = null;
         Logger _logger;
@@ -26,14 +26,19 @@ namespace Backend
         /// </summary>
         public bool Init()
         {
+            Utils.LoadConfig();
+            _logger = new Logger(Settings.Get("LOG_FILE_PATH"));
             try
             {
-                Utils.LoadConfig();
-                _logger = new Logger(Settings.Get("LOG_FILE_PATH"));
-                _logger.WriteLog("Starting connect timer", "info");
+                //int connectTimerSec = int.Parse(Settings.Get("CONNECT_TIMER_SEC"));
+                //int readyTimerSec = int.Parse(Settings.Get("READY_TIMER_SEC"));
+               // _getAgentConnectTimer = new System.Timers.Timer(new TimeSpan(0, 0, connectTimerSec).TotalMilliseconds);
+               // _getAgentReadyTimer = new System.Timers.Timer(new TimeSpan(0, 0, readyTimerSec).TotalMilliseconds);
                 _getAgentConnectTimer.Elapsed += GetAgentConnectTimer_Elapsed;
                 _getAgentReadyTimer.Elapsed += GetAgentReadyTimer_Elapsed;
+
                 _getAgentConnectTimer.Start();
+                _logger.WriteLog("Starting connect timer", "info");
 
                 InitAgents();
                 InsertDevicesToPortal(Settings.Get("CONFIG_FILE"));
@@ -72,7 +77,7 @@ namespace Backend
             _getAgentConnectTimer.Stop();
             DistributeDevicesAmongAgents();
             _logger.WriteLog($"Starting agent ready timer", "info");
-            _getAgentReadyTimer.Start(); // todo: do it after the first getReady message recieved
+            _getAgentReadyTimer.Start();
         }
 
         /// <summary>
