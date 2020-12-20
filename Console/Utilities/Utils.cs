@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Configuration;
 using System.Diagnostics;
 using System.IO;
+using System.Threading.Tasks;
 
 namespace Console.Utilities
 {
@@ -54,6 +55,54 @@ namespace Console.Utilities
             return returnCode;
         }
 
+        /// <summary>
+        /// Run Windows command in background asynchronically
+        /// </summary>
+        /// <param name="exeFile">Executable file</param>
+        /// <param name="cmd">command</param>
+        /// <param name="args">arguments</param>
+        /// <param name="outputFile">Output file path</param>
+        /// <returns>Command return code</returns>
+        public static async Task RunCommandAsync(string exeFile, string cmd, string args, string cwd, string outputFile)
+        {
+            ProcessStartInfo start = new ProcessStartInfo();
+            start.FileName = exeFile;
+            start.Arguments = string.Format("{0} {1}", cmd, args);
+            start.WorkingDirectory = cwd;
+            start.UseShellExecute = false;
+            start.RedirectStandardOutput = true;
+            start.RedirectStandardError = true;
+
+            await Task.Run(() =>
+            {
+                int returnCode = 0;
+                using (Process process = Process.Start(start))
+                {
+                    process.WaitForExit();
+                    using (StreamReader reader = process.StandardOutput)
+                    {
+                        string output = reader.ReadToEnd();
+                        if (outputFile != null)
+                        {
+                            using (StreamWriter writer = new StreamWriter(outputFile, append: true))
+                            {
+                                writer.Write(output);
+                            }
+                        }
+                    }
+                    using (StreamReader reader = process.StandardError)
+                    {
+                        string output = reader.ReadToEnd();
+                        using (StreamWriter writer = new StreamWriter(outputFile, append: true))
+                        {
+                            writer.Write(output);
+                        }
+                    }
+                    returnCode = process.ExitCode;
+                }
+            });
+        }
+
         private static void Process_ErrorDataReceived(object sender, DataReceivedEventArgs e)
         {
             
@@ -64,19 +113,20 @@ namespace Console.Utilities
         /// </summary>
         /// <param name="jsonFile">json file</param>
         /// <returns>list of agent objects</returns>
-        public static List<Agent> ReadAgentsFromFile(string jsonFile)
+        public static List<Agent> ReadAgentsFromFile(string agentsFilePath)
         {
             List<Agent> agentList = null;
             try
             {
-                using (StreamReader reader = new StreamReader(jsonFile))
+                using (StreamReader reader = new StreamReader(agentsFilePath))
                 {
                     string json = reader.ReadToEnd();
                     agentList = JsonConvert.DeserializeObject<List<Agent>>(json);
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                string msg = ex.Message;
                 agentList = null;
             }
             if (agentList == null)
@@ -91,10 +141,10 @@ namespace Console.Utilities
         /// </summary>
         /// <param name="list">agent list</param>
         /// <param name="jsonFile">json file</param>
-        public static void WriteAgentListToFile(List<Agent> list, string jsonFile)
+        public static void WriteAgentListToFile(List<Agent> list, string agentsFilePath)
         {
             string jsonObj = JsonConvert.SerializeObject(list);
-            using (StreamWriter writer = new StreamWriter(jsonFile))
+            using (StreamWriter writer = new StreamWriter(agentsFilePath))
             {
                 writer.Write(jsonObj);
             }
@@ -142,6 +192,15 @@ namespace Console.Utilities
                     string[] fields = line.Split('=');
                     Settings.settingsDict[fields[0]] = fields[1];
                 }
+            }
+        }
+
+        public static void WriteLog(string msg, string level)
+        {
+            using (StreamWriter writer = new StreamWriter(Settings.Get("LOG_FILE_PATH"), append: true))
+            {
+                string nowTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                writer.WriteLine($"{nowTime} [{level.ToUpper()}] : {msg}");
             }
         }
 

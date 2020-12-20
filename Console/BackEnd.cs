@@ -6,6 +6,7 @@ using Shared;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading.Tasks;
 
 namespace Backend
 {
@@ -13,9 +14,10 @@ namespace Backend
     {
         System.Timers.Timer _getAgentConnectTimer = new System.Timers.Timer(new TimeSpan(0, 0, 30).TotalMilliseconds);
         System.Timers.Timer _getAgentReadyTimer = new System.Timers.Timer(new TimeSpan(0, 1, 0).TotalMilliseconds);
-        List<Agent> _agents = null;
+        private static List<Agent> _agents = new List<Agent>();
         List<Device> _devices = null;
-        Logger _logger;
+        private static readonly object _lock = new object();
+        //Logger _logger;
 
         /// <summary>
         /// Initialize backend:
@@ -24,10 +26,10 @@ namespace Backend
         /// Insert devices to portal
         /// Collect AWS services and instances
         /// </summary>
-        public bool Init()
+        public void Init()
         {
             Utils.LoadConfig();
-            _logger = new Logger(Settings.Get("LOG_FILE_PATH"));
+            //_logger = new Logger(Settings.Get("LOG_FILE_PATH"));
             try
             {
                 //int connectTimerSec = int.Parse(Settings.Get("CONNECT_TIMER_SEC"));
@@ -38,19 +40,17 @@ namespace Backend
                 _getAgentReadyTimer.Elapsed += GetAgentReadyTimer_Elapsed;
 
                 _getAgentConnectTimer.Start();
-                _logger.WriteLog("Starting connect timer", "info");
+                Utils.WriteLog("Starting connect timer", "info");
 
-                InitAgents();
+                //InitAgents(agentsFile);
                 InsertDevicesToPortal(Settings.Get("CONFIG_FILE"));
                 //InsertDevicesToPortal(Settings.Get("ENV"), Settings.Get("DEVICES_PATH"));
                 //CollectAWSServices(Settings.Get("ENV"));
                 //CollectAWSInstances();
-                return true;
             }
             catch (Exception ex)
             {
-                _logger.WriteLog($"Error:{ex.Message} {ex.Source} {ex.StackTrace}", "error");
-                return false;
+                Utils.WriteLog($"Error:{ex.Message} {ex.Source} {ex.StackTrace}", "error");
             }
             
 
@@ -75,8 +75,9 @@ namespace Backend
         private void GetAgentConnectTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
         {  
             _getAgentConnectTimer.Stop();
+            Utils.WriteAgentListToFile(_agents, Settings.Get("AGENTS_PATH"));
             DistributeDevicesAmongAgents();
-            _logger.WriteLog($"Starting agent ready timer", "info");
+            Utils.WriteLog($"Starting agent ready timer", "info");
             _getAgentReadyTimer.Start();
         }
 
@@ -88,6 +89,7 @@ namespace Backend
         private void GetAgentReadyTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
         {
             _getAgentReadyTimer.Stop();
+            Utils.WriteAgentListToFile(_agents, Settings.Get("AGENTS_PATH"));
             SendAutomationScript();
         }
 
@@ -96,39 +98,56 @@ namespace Backend
         /// </summary>
         /// <param name="agentUrl">agent URL</param>
         /// <returns>true/false if connection succeeded</returns>
-        public bool Connect(string agentUrl)
+        public async Task<bool> Connect(string agentUrl)
         {
             Utils.LoadConfig();
-            _logger = new Logger(Settings.Get("LOG_FILE_PATH"));
+            //_logger = new Logger(Settings.Get("LOG_FILE_PATH"));
             try
             {
-                _logger.WriteLog($"Received agent connect from {agentUrl}.", "info");
-                _agents = Utils.ReadAgentsFromFile(Settings.Get("AGENTS_PATH"));
+                string agentsPath = Settings.Get("AGENTS_PATH");
+                Utils.WriteLog($"Received agent connect from {agentUrl}.", "info");
+                string agentsFilePath = Settings.Get("AGENTS_PATH");
 
-                if (_agents.Count == 0)
+                Utils.WriteLog($"Agent {agentUrl} is connecting.", "info");
+
+                // lock code
+                lock (_lock)
                 {
-                    Init();
+                    // Init agents file when first agent is connecting
+                    //_agents = Utils.ReadAgentsFromFile(agentsFilePath);
+
+                    Utils.WriteLog($"Current agents number: {_agents.Count}.", "info");
+
+                    if (_agents.Count == 0)
+                    {
+                        Init();
+                    }
+    
+                    Agent agent = _agents.Find(a => a.URL == agentUrl);
+                    if (agent != null)
+                    {
+                        Utils.WriteLog($"Agent {agentUrl} already exists.", "info");
+                    }
+                    else
+                    {
+                        if (Settings.Get("MODE").ToLower() == "debug")
+                        {
+                            agentUrl = agentUrl.Replace("127.0.0.1", "localhost");
+                        }
+                        string[] urlStrings = agentUrl.Split(':');
+                        Utils.WriteLog($"Adding agent {agentUrl} to pool.", "info");
+                        _agents.Add(new Agent(urlStrings[0], int.Parse(urlStrings[1]), false));
+                        Utils.WriteLog($"Agents count: {_agents.Count}.", "info");
+                        //Utils.WriteAgentListToFile(_agents, agentsFilePath);
+                    }
                 }
 
-                _logger.WriteLog($"Agent {agentUrl} is connecting.", "info");
-                Agent agent = _agents.Find(a => a.URL == agentUrl);
-                if (agent != null)
-                {
-                    return false;
-                }
-                if (Settings.Get("MODE").ToLower() == "debug")
-                {
-                    agentUrl = agentUrl.Replace("127.0.0.1", "localhost");
-                }
-                string[] urlStrings = agentUrl.Split(':');
-                _logger.WriteLog($"Adding agent {agentUrl} to pool.", "info");
-                _agents.Add(new Agent(urlStrings[0], int.Parse(urlStrings[1]), false));
-                Utils.WriteAgentListToFile(_agents, Settings.Get("AGENTS_PATH"));
+                await Task.Delay(10);
                 return true;
             }
             catch(Exception ex)
             {
-                _logger.WriteLog($"Error in connect: {ex.Message} {ex.StackTrace}", "error");
+                Utils.WriteLog($"Error in connect: {ex.Message} {ex.StackTrace}", "error");
                 return false;
             }
         }
@@ -137,10 +156,12 @@ namespace Backend
         /// Updates requested agent status to Ready
         /// </summary>
         /// <param name="url">agent URL</param>
-        public void AgentReady(string url)
+        public async Task<bool> AgentReady(string url)
         {
             Utils.LoadConfig();
-            _logger = new Logger(Settings.Get("LOG_FILE_PATH"));
+            //_logger = new Logger(Settings.Get("LOG_FILE_PATH"));
+            string agentsFilePath = Settings.Get("AGENTS_PATH");
+
             try
             {
                 if (Settings.Get("MODE").ToLower() == "debug")
@@ -148,27 +169,34 @@ namespace Backend
                     url = url.Replace("127.0.0.1", "localhost");
                 }
 
-                _logger.WriteLog($"Received agent ready from {url}.", "info");
-                _agents = Utils.ReadAgentsFromFile(Settings.Get("AGENTS_PATH"));
-                Agent agent = _agents.Find(a => a.URL == url);
-                if (agent == null)
+                Utils.WriteLog($"Received agent ready from {url}.", "info");
+
+                // lock code
+                lock (_lock)
                 {
-                    _logger.WriteLog($"Agent {url} does not exist", "error");
-                    throw new Exception("Agent does not exist.");
+                    //_agents = Utils.ReadAgentsFromFile(agentsFilePath);
+                    Agent agent = _agents.Find(a => a.URL == url);
+                    if (agent == null)
+                    {
+                        Utils.WriteLog($"Agent {url} does not exist", "error");
+                    }
+                    agent.IsReady = true;
+                    //Utils.WriteAgentListToFile(_agents, agentsFilePath);
                 }
-                agent.IsReady = true;
-                Utils.WriteAgentListToFile(_agents, Settings.Get("AGENTS_PATH"));
+                await Task.Delay(10);
+                return true;
             }
             catch (Exception ex)
             {
-                _logger.WriteLog($"Error in agentReady: {ex.Message} {ex.StackTrace}", "error");
+                Utils.WriteLog($"Error in agentReady: {ex.Message} {ex.StackTrace}", "error");
+                return false;
             }
         }
 
         public void GetComparisonResults(string url, string jsonContent)
         {
             Utils.LoadConfig();
-            _logger = new Logger(Settings.Get("LOG_FILE_PATH"));
+            //_logger = new Logger(Settings.Get("LOG_FILE_PATH"));
             try
             {
                 if (Settings.Get("MODE").ToLower() == "debug")
@@ -220,7 +248,7 @@ namespace Backend
             }
             catch (Exception ex)
             {
-                _logger.WriteLog($"{ex.Message} {ex.StackTrace}", "error");
+                Utils.WriteLog($"{ex.Message} {ex.StackTrace}", "error");
             }
         }
 
@@ -233,7 +261,7 @@ namespace Backend
         public void GetScriptLog(string url, string jsonContent)
         {
             Utils.LoadConfig();
-            _logger = new Logger(Settings.Get("LOG_FILE_PATH"));
+            //_logger = new Logger(Settings.Get("LOG_FILE_PATH"));
             try
             {
                 if (Settings.Get("MODE").ToLower() == "debug")
@@ -257,20 +285,20 @@ namespace Backend
             }
             catch (Exception ex)
             {
-                _logger.WriteLog($"{ex.Message} {ex.StackTrace}", "error");
+                Utils.WriteLog($"{ex.Message} {ex.StackTrace}", "error");
             }
         }
 
         /// <summary>
         /// Create empty json file agents.json in base folder
         /// </summary>
-        private void InitAgents()
+        private void InitAgents(FileStream agentsFile)
         {
-            _logger.WriteLog("Init agents file.", "info");
-            using (StreamWriter writer = new StreamWriter(Settings.Get("AGENTS_PATH")))
+            Utils.WriteLog("Init agents file.", "info");
+            using (StreamWriter writer = new StreamWriter(agentsFile))
             {
                 writer.Write("");
-            }         
+            }
         }
 
         public List<Agent> GetAgents()
@@ -293,16 +321,15 @@ namespace Backend
         {
             try
             {
-                _logger.WriteLog("Insert devices to portal.", "info");
+                Utils.WriteLog("Insert devices to portal.", "info");
                 string pythonScriptsFolder = Settings.Get("PYTHON_SCRIPTS_PATH");
                 string pythonExePath = Settings.Get("PYTHON");
-                _logger.WriteLog($"Python exe path: {pythonExePath}", "info");
-                int returnCode = Utils.RunCommand(pythonExePath, "insert_devices.py", $"{configFile}", pythonScriptsFolder, Settings.Get("OUTPUT"));
-                Utils.WriteToFile(Settings.Get("RETURN_CODE"), returnCode.ToString(), false);
+                Utils.WriteLog($"Python exe path: {pythonExePath}", "info");
+                Utils.RunCommand(pythonExePath, "insert_devices.py", $"{configFile}", pythonScriptsFolder, Settings.Get("OUTPUT"));
             }
             catch (Exception ex)
             {
-                _logger.WriteLog($"Error in insertDevices: {ex.Message} {ex.StackTrace}", "error");
+                Utils.WriteLog($"Error in insertDevices: {ex.Message} {ex.StackTrace}", "error");
             }
         }
 
@@ -313,13 +340,13 @@ namespace Backend
         {
             try
             {
-                _logger.WriteLog($"Distribute device among agents.", "info");
+                Utils.WriteLog($"Distribute device among agents.", "info");
                 int returnCode = Utils.RunCommand(Settings.Get("PYTHON"), "distribute_devices.py", $"{Settings.Get("CONFIG_FILE")}", Settings.Get("PYTHON_SCRIPTS_PATH"), Settings.Get("OUTPUT"));
                 Utils.WriteToFile(Settings.Get("RETURN_CODE"), returnCode.ToString(), false);
             }
             catch (Exception ex)
             {
-                _logger.WriteLog($"Error in distributeDevices: {ex.Message} {ex.StackTrace}", "error");
+                Utils.WriteLog($"Error in distributeDevices: {ex.Message} {ex.StackTrace}", "error");
             }
         }
 
@@ -330,13 +357,13 @@ namespace Backend
         {
             try
             {
-                _logger.WriteLog("Send automation script to agents.", "info");
+                Utils.WriteLog("Send automation script to agents.", "info");
                 int returnCode = Utils.RunCommand(Settings.Get("PYTHON"), "send_script.py", $"{Settings.Get("CONFIG_FILE")}", Settings.Get("PYTHON_SCRIPTS_PATH"), Settings.Get("OUTPUT"));
                 Utils.WriteToFile(Settings.Get("RETURN_CODE"), returnCode.ToString(), false);
             }
             catch (Exception ex)
             {
-                _logger.WriteLog($"Error in sendAutomationScript: {ex.Message} {ex.StackTrace}", "error");
+                Utils.WriteLog($"Error in sendAutomationScript: {ex.Message} {ex.StackTrace}", "error");
             }
         }
 
@@ -346,7 +373,7 @@ namespace Backend
         /// <param name="env">environment</param>
         private void CollectAWSServices(string env)
         {
-            _logger.WriteLog("Collect AWS services.", "info");
+            Utils.WriteLog("Collect AWS services.", "info");
             string cwd = Directory.GetCurrentDirectory();
             Utils.RunCommand("aws", "ecs", $"list-services --cluster {env}-ECS-Cluster", cwd, Settings.Get("AWS_SERVICES_PATH"));
         }
@@ -356,7 +383,7 @@ namespace Backend
         /// </summary>
         private void CollectAWSInstances()
         {
-            _logger.WriteLog("Collect AWS instances.", "info");
+            Utils.WriteLog("Collect AWS instances.", "info");
             int returnCode = Utils.RunCommand(Settings.Get("PYTHON"), "collect_aws_instances.py", $"{Settings.Get("AWS_INSTANCES_PATH")}", Settings.Get("PYTHON_SCRIPTS_PATH"), Settings.Get("OUTPUT"));
             Utils.WriteToFile(Settings.Get("RETURN_CODE"), returnCode.ToString(), false);
         }
@@ -364,7 +391,7 @@ namespace Backend
         public string TestCommand(string num)
         {
             Utils.LoadConfig();
-            _logger = new Logger(Settings.Get("LOG_FILE_PATH"));
+            //_logger = new Logger(Settings.Get("LOG_FILE_PATH"));
 
             try
             {
@@ -377,7 +404,7 @@ namespace Backend
 
             catch (Exception ex)
             {
-                _logger.WriteLog($"Error: {ex.StackTrace}", "error");
+                Utils.WriteLog($"Error: {ex.StackTrace}", "error");
                 return "fail";
             }
         }

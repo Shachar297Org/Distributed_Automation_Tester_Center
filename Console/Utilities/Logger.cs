@@ -7,9 +7,8 @@ namespace Console.Utilities
         public Logger(string logfile)
         {
             Log.Logger = new LoggerConfiguration()
-                .MinimumLevel.Verbose()
-                .WriteTo.Console()
-                .WriteTo.File(logfile, rollingInterval: RollingInterval.Day)
+                .MinimumLevel.Debug()
+                .WriteTo.File(logfile)
                 .CreateLogger();
         }
 
