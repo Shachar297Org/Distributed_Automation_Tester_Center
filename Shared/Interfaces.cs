@@ -13,9 +13,9 @@ namespace Shared
 
         Task<bool> AgentReady(string url);
 
-        void GetScriptLog(string url, string jsonContent);
+        Task GetScriptLog(string url, string jsonContent);
 
-        void GetComparisonResults(string url, string jsonContent);
+        Task GetComparisonResults(string url, string jsonContent);
 
         void Init();
 

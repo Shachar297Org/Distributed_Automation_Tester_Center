@@ -93,14 +93,14 @@ namespace TestCenterApp.Controllers
         // POST: getScriptLog
         [HttpPost]
         [Route("getScriptLog")]
-        public HttpResponseMessage GetScriptLog()
+        public async Task<HttpResponseMessage> GetScriptLog()
         {
             string agentIP = HttpContext.Current.Request.ServerVariables["REMOTE_ADDR"];
             HttpContent requestContent = Request.Content;
             try
             {
                 string jsonContent = requestContent.ReadAsStringAsync().Result;
-                backEnd.GetScriptLog(agentIP, jsonContent);
+                await backEnd.GetScriptLog(agentIP, jsonContent);
                 string msg = "Script log was received";
                 var response = Request.CreateResponse(HttpStatusCode.OK);
                 response.Content = new StringContent(("{result:" + msg + "}"), Encoding.UTF8, "application/json");
@@ -118,14 +118,14 @@ namespace TestCenterApp.Controllers
         // POST: getComparisonResults
         [HttpPost]
         [Route("getComparisonResults")]
-        public HttpResponseMessage GetComparisonResults()
+        public async Task<HttpResponseMessage> GetComparisonResults()
         {
             string agentIP = HttpContext.Current.Request.ServerVariables["REMOTE_ADDR"];
             HttpContent requestContent = Request.Content;
             try
             {
                 string jsonContent = requestContent.ReadAsStringAsync().Result;
-                backEnd.GetComparisonResults(agentIP, jsonContent);
+                await backEnd.GetComparisonResults(agentIP, jsonContent);
                 string msg = "Comparison results were received";
                 var response = Request.CreateResponse(HttpStatusCode.OK);
                 response.Content = new StringContent(("{result:" + msg + "}"), Encoding.UTF8, "application/json");

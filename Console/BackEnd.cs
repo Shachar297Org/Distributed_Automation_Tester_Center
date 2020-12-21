@@ -13,12 +13,11 @@ namespace Backend
 {
     public class BackEnd : IBackEndInterfaces
     {
-        System.Timers.Timer _getAgentConnectTimer = new System.Timers.Timer(new TimeSpan(0, 0, 30).TotalMilliseconds);
-        System.Timers.Timer _getAgentReadyTimer = new System.Timers.Timer(new TimeSpan(0, 1, 0).TotalMilliseconds);
+        private static System.Timers.Timer _getAgentConnectTimer = new System.Timers.Timer(new TimeSpan(0, 1, 0).TotalMilliseconds);
+        private static System.Timers.Timer _getAgentReadyTimer = new System.Timers.Timer(new TimeSpan(0, 1, 0).TotalMilliseconds);
         private static List<Agent> _agents = new List<Agent>();
-        List<Device> _devices = null;
-        private static readonly object _lock = new object();
-        //Logger _logger;
+        private static List<Device> _devices = null;
+        private static object _lock = new object();
 
         /// <summary>
         /// Initialize backend:
@@ -30,7 +29,6 @@ namespace Backend
         public void Init()
         {
             Utils.LoadConfig();
-            //_logger = new Logger(Settings.Get("LOG_FILE_PATH"));
             try
             {
                 //int connectTimerSec = int.Parse(Settings.Get("CONNECT_TIMER_SEC"));
@@ -52,6 +50,10 @@ namespace Backend
             catch (Exception ex)
             {
                 Utils.WriteLog($"Error:{ex.Message} {ex.Source} {ex.StackTrace}", "error");
+            }
+            finally
+            {
+                Utils.WriteLog("finished Init", "info");
             }
             
 
@@ -101,29 +103,29 @@ namespace Backend
         /// <returns>true/false if connection succeeded</returns>
         public async Task<bool> Connect(string agentUrl)
         {
-            Utils.LoadConfig();
-            //_logger = new Logger(Settings.Get("LOG_FILE_PATH"));
-            try
+            lock (_lock)
             {
-                string agentsPath = Settings.Get("AGENTS_PATH");
-                Utils.WriteLog($"Received agent connect from {agentUrl}.", "info");
-                string agentsFilePath = Settings.Get("AGENTS_PATH");
-
-                Utils.WriteLog($"Agent {agentUrl} is connecting.", "info");
-
-                // lock code
-                lock (_lock)
+                Utils.LoadConfig();
+                try
                 {
+
+                    string agentsPath = Settings.Get("AGENTS_PATH");
+                    Utils.WriteLog($"Received agent connect from {agentUrl}.", "info");
+                    string agentsFilePath = Settings.Get("AGENTS_PATH");
+
+                    Utils.WriteLog($"Agent {agentUrl} is connecting...", "info");
+                    // lock code
+
+                    Utils.WriteLog($"Agent {agentUrl}: entering critical code...", "info");
                     // Init agents file when first agent is connecting
                     //_agents = Utils.ReadAgentsFromFile(agentsFilePath);
 
                     Utils.WriteLog($"Current agents number: {_agents.Count}.", "info");
-
                     if (_agents.Count == 0)
                     {
                         Init();
                     }
-    
+
                     Agent agent = _agents.Find(a => a.URL == agentUrl);
                     if (agent != null)
                     {
@@ -141,15 +143,22 @@ namespace Backend
                         Utils.WriteLog($"Agents count: {_agents.Count}.", "info");
                         //Utils.WriteAgentListToFile(_agents, agentsFilePath);
                     }
-                }
+                    Utils.WriteLog($"Agent {agentUrl}: exiting critical code...", "info");
 
-                await Task.Delay(10);
-                return true;
-            }
-            catch(Exception ex)
-            {
-                Utils.WriteLog($"Error in connect: {ex.Message} {ex.StackTrace}", "error");
-                return false;
+                    //Utils.WriteLog($"Agent {agentUrl} was connected successfully.", "info");
+
+                    // await Task.Delay(10);
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    Utils.WriteLog($"Error in connect: {ex.Message} {ex.StackTrace}", "error");
+                    return false;
+                }
+                finally
+                {
+                    Utils.WriteLog("finished Connect", "info");
+                }
             }
         }
 
@@ -159,22 +168,23 @@ namespace Backend
         /// <param name="url">agent URL</param>
         public async Task<bool> AgentReady(string url)
         {
-            Utils.LoadConfig();
-            //_logger = new Logger(Settings.Get("LOG_FILE_PATH"));
-            string agentsFilePath = Settings.Get("AGENTS_PATH");
-
-            try
+            lock (_lock)
             {
-                if (Settings.Get("MODE").ToLower() == "debug")
-                {
-                    url = url.Replace("127.0.0.1", "localhost");
-                }
+                Utils.LoadConfig();
+                string agentsFilePath = Settings.Get("AGENTS_PATH");
 
-                Utils.WriteLog($"Received agent ready from {url}.", "info");
-
-                // lock code
-                lock (_lock)
+                try
                 {
+                    if (Settings.Get("MODE").ToLower() == "debug")
+                    {
+                        url = url.Replace("127.0.0.1", "localhost");
+                    }
+
+                    // lock code
+
+                    Utils.WriteLog($"Received agent ready from {url}.", "info");
+
+
                     //_agents = Utils.ReadAgentsFromFile(agentsFilePath);
                     Agent agent = _agents.Find(a => a.URL == url);
                     if (agent == null)
@@ -183,21 +193,20 @@ namespace Backend
                     }
                     agent.IsReady = true;
                     //Utils.WriteAgentListToFile(_agents, agentsFilePath);
+
+                    return true;
                 }
-                await Task.Delay(10);
-                return true;
-            }
-            catch (Exception ex)
-            {
-                Utils.WriteLog($"Error in agentReady: {ex.Message} {ex.StackTrace}", "error");
-                return false;
+                catch (Exception ex)
+                {
+                    Utils.WriteLog($"Error in agentReady: {ex.Message} {ex.StackTrace}", "error");
+                    return false;
+                }
             }
         }
 
-        public void GetComparisonResults(string url, string jsonContent)
+        public async Task GetComparisonResults(string url, string jsonContent)
         {
             Utils.LoadConfig();
-            //_logger = new Logger(Settings.Get("LOG_FILE_PATH"));
             try
             {
                 if (Settings.Get("MODE").ToLower() == "debug")
@@ -259,10 +268,9 @@ namespace Backend
         /// <param name="url">agent url</param>
         /// <param name="content">Response content</param>
         /// <returns>true/false if operation succeeds</returns>
-        public void GetScriptLog(string url, string jsonContent)
+        public async Task GetScriptLog(string url, string jsonContent)
         {
             Utils.LoadConfig();
-            //_logger = new Logger(Settings.Get("LOG_FILE_PATH"));
             try
             {
                 if (Settings.Get("MODE").ToLower() == "debug")
@@ -287,18 +295,6 @@ namespace Backend
             catch (Exception ex)
             {
                 Utils.WriteLog($"{ex.Message} {ex.StackTrace}", "error");
-            }
-        }
-
-        /// <summary>
-        /// Create empty json file agents.json in base folder
-        /// </summary>
-        private void InitAgents(FileStream agentsFile)
-        {
-            Utils.WriteLog("Init agents file.", "info");
-            using (StreamWriter writer = new StreamWriter(agentsFile))
-            {
-                writer.Write("");
             }
         }
 
@@ -407,7 +403,6 @@ namespace Backend
         public string TestCommand(string num)
         {
             Utils.LoadConfig();
-            //_logger = new Logger(Settings.Get("LOG_FILE_PATH"));
 
             try
             {
