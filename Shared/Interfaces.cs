@@ -20,5 +20,8 @@ namespace Shared
         void Init();
 
         string TestCommand(string num);
+
+        List<string> GetAgents();
+        void Reset();
     }
 }

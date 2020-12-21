@@ -141,6 +141,28 @@ namespace TestCenterApp.Controllers
         }
 
         [HttpGet]
+        [Route("getAgents")]
+        public HttpResponseMessage GetAgents()
+        {
+            Utils.LoadConfig();
+            List<string> agents = backEnd.GetAgents();
+            string agentsString = string.Join(",", agents);
+            var response = Request.CreateResponse(HttpStatusCode.OK);
+            response.Content = new StringContent(("{agents:" + agentsString + ", count:" + agents.Count + "}"), Encoding.UTF8, "application/json");
+            return response;
+        }
+
+        [HttpGet]
+        [Route("Reset")]
+        public HttpResponseMessage Reset()
+        {
+            backEnd.Reset();
+            var response = Request.CreateResponse(HttpStatusCode.OK);
+            response.Content = new StringContent(("{Result: center was reset}"), Encoding.UTF8, "application/json");
+            return response;
+        }
+
+        [HttpGet]
         [Route("testcmd")]
         public HttpResponseMessage TestCommand(string num)
         {

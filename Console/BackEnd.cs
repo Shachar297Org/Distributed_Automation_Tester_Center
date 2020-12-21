@@ -6,6 +6,7 @@ using Shared;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace Backend
@@ -301,9 +302,10 @@ namespace Backend
             }
         }
 
-        public List<Agent> GetAgents()
+        public List<string> GetAgents()
         {
-            return _agents;
+            List<string> agentUrls = (from agent in _agents select agent.URL).ToList();
+            return agentUrls;
         }
 
         public List<Device> GetDevices()
@@ -386,6 +388,20 @@ namespace Backend
             Utils.WriteLog("Collect AWS instances.", "info");
             int returnCode = Utils.RunCommand(Settings.Get("PYTHON"), "collect_aws_instances.py", $"{Settings.Get("AWS_INSTANCES_PATH")}", Settings.Get("PYTHON_SCRIPTS_PATH"), Settings.Get("OUTPUT"));
             Utils.WriteToFile(Settings.Get("RETURN_CODE"), returnCode.ToString(), false);
+        }
+
+        public void Reset()
+        {
+            Utils.LoadConfig();
+            _agents.Clear();
+            string agentsPath = Settings.Get("AGENTS_PATH");
+            string outputPath = Settings.Get("OUTPUT");
+            string returncodePath = Settings.Get("RETURN_CODE");
+            string logfilePath =  Settings.Get("LOG_FILE_PATH");
+            File.Delete(agentsPath);
+            File.Delete(outputPath);
+            File.Delete(returncodePath);
+            File.Delete(logfilePath);
         }
 
         public string TestCommand(string num)
