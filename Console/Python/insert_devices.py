@@ -68,7 +68,7 @@ def RetrieveDevicesFromPortal(config: object):
             deviceRec = {'deviceType': deviceType,
                          'deviceSerialNumber': serialNum}
             deviceRecords.append(deviceRec)
-        return deviceRecords
+        return deviceRecords, accessToken
     else:
         print('Error: cannot retreive devices from portal. status code: {}.'.format(
             response.status_code))
@@ -159,11 +159,11 @@ def GetDeltaDevices(devicesList1, devicesList2):
     return deltaDevices
 
 
-def InsertDevices(env: str, deviceRecords: dict, config: object):
+def InsertDevices(accessToken: str, env: str, deviceRecords: dict, config: object):
     """
     Insert new devices from csv file to portal
     """
-    accessToken = SendRequestLogin(config)
+    #accessToken = SendRequestLogin(config)
     if not accessToken:
         print('Error: Login failed.')
         return
@@ -209,7 +209,7 @@ if __name__ == "__main__":
         print('Devices csv file: {}'.format(devicesCsvFile))
         print('Env: {}'.format(env))
 
-        portalDeviceRecords = RetrieveDevicesFromPortal(config)
+        portalDeviceRecords, accessToken = RetrieveDevicesFromPortal(config)
         print('Devices in portal: {}'.format(len(portalDeviceRecords)))
 
         csvDeviceRecords = ReadRecordsFromCsvFile(devicesCsvFile)
@@ -219,7 +219,7 @@ if __name__ == "__main__":
         for deltaDevice in newDevices:
             print(deltaDevice)
 
-        InsertDevices(env, newDevices, config)
+        InsertDevices(accessToken, env, newDevices, config)
 
         print('-----success-----')
 
