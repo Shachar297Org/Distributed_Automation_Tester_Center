@@ -27,7 +27,56 @@ def GetDeviceEntries(dbConn: object):
     return resultsSet
 
 
-def CollectDevicesFromPortal(config: object):
+def RetrieveDevicesFromPortal(config: object):
+    """
+    Retrieve device list from portal and return list of their records {GA, SN}
+    """
+    simFlag = True if config['RDS_SIM'] == 'True' else False
+    if simFlag:
+        return [
+            {'deviceType': 'GA-0000080CN', 'deviceSerialNumber': 'ELAD-TEST-1'},
+            {'deviceType': 'GA-0000080CN', 'deviceSerialNumber': 'ELAD-TEST-2'},
+            {'deviceType': 'GA-0000080CN', 'deviceSerialNumber': 'ELAD-TEST-3'},
+            {'deviceType': 'GA-0000080CN', 'deviceSerialNumber': 'ELAD-TEST-4'},
+            {'deviceType': 'GA-0000080CN', 'deviceSerialNumber': 'ELAD-TEST-5'},
+            {'deviceType': 'GA-0000080CN', 'deviceSerialNumber': 'ELAD-TEST-6'},
+            {'deviceType': 'GA-0000080CN', 'deviceSerialNumber': 'ELAD-TEST-7'},
+            {'deviceType': 'GA-0000080CN', 'deviceSerialNumber': 'ELAD-TEST-8'},
+            {'deviceType': 'GA-0000180', 'deviceSerialNumber': 'ELAD-TEST-9'},
+            {'deviceType': 'GA-0000180', 'deviceSerialNumber': 'ELAD-TEST-10'},
+            {'deviceType': 'GA-0000180', 'deviceSerialNumber': 'ELAD-TEST-11'},
+            {'deviceType': 'GA-0000080CN', 'deviceSerialNumber': 'ELAD-TEST-12'},
+        ]
+
+    accessToken = SendRequestLogin(config)
+    if not accessToken:
+        print('Error: Login failed.')
+        return
+    print('Login success.')
+
+    getDeviceHost = config['API_SEARCH_DEVICE']
+    response = requests.get(url=getDeviceHost, headers={'Content-Type': 'application/json', 'Authorization': 'Bearer {}'.format(
+        accessToken)})
+    if response.ok:
+        print('Devices list was retrieved successfully.')
+        jsonObj = response.json()
+        jsonData = jsonObj['data']
+        deviceRecords = []
+        for jsonDeviceObj in jsonData:
+            deviceType = jsonDeviceObj['deviceInfo']['deviceType']
+            serialNum = jsonDeviceObj['deviceInfo']['deviceSerialNumber']
+            deviceRec = {'deviceType': deviceType,
+                         'deviceSerialNumber': serialNum}
+            deviceRecords.append(deviceRec)
+        return deviceRecords
+    else:
+        print('Error: cannot retreive devices from portal. status code: {}.'.format(
+            response.status_code))
+        raise Exception('Error: {}: {}'.format(
+            response.status_code, response.text))
+
+
+def CollectDevicesFromPortalOld(config: object):
     """
     Collect devices list from the portal and return list of their records {GA, SN}
     """
@@ -52,12 +101,6 @@ def CollectDevicesFromPortal(config: object):
             {'deviceType': 'GA-0000180', 'deviceSerialNumber': 'ELAD-TEST-10'},
             {'deviceType': 'GA-0000180', 'deviceSerialNumber': 'ELAD-TEST-11'},
             {'deviceType': 'GA-0000080CN', 'deviceSerialNumber': 'ELAD-TEST-12'},
-            {'deviceType': 'GA-0000180',
-                'deviceSerialNumber': 'ELAD-TEST-13'},  # new
-            {'deviceType': 'GA-0000180',
-                'deviceSerialNumber': 'ELAD-TEST-14'},  # new
-            {'deviceType': 'GA-0000180',
-                'deviceSerialNumber': 'ELAD-TEST-15'},  # new
         ]
     else:
         deviceRecords = []
@@ -138,6 +181,7 @@ if __name__ == "__main__":
     import requests
     import json
     import configparser
+    import traceback
     from utils import *
     from sql import *
     from record import *
@@ -165,18 +209,22 @@ if __name__ == "__main__":
         print('Devices csv file: {}'.format(devicesCsvFile))
         print('Env: {}'.format(env))
 
-        portalDeviceRecords = CollectDevicesFromPortal(config)
-
-        print('Devices: {}'.format(portalDeviceRecords))
+        portalDeviceRecords = RetrieveDevicesFromPortal(config)
+        print('Devices in portal: {}'.format(len(portalDeviceRecords)))
 
         csvDeviceRecords = ReadRecordsFromCsvFile(devicesCsvFile)
-        deltaDevices = GetDeltaDevices(csvDeviceRecords, portalDeviceRecords)
+        newDevices = GetDeltaDevices(csvDeviceRecords, portalDeviceRecords)
 
-        InsertDevices(env, deltaDevices, config)
+        print('New devices:')
+        for deltaDevice in newDevices:
+            print(deltaDevice)
+
+        InsertDevices(env, newDevices, config)
 
         print('-----success-----')
 
     except Exception as ex:
         print('Error: {}'.format(ex))
+        traceback.print_exc()
         print('-----fail-----')
         exit(1)

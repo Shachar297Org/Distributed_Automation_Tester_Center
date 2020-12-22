@@ -113,8 +113,7 @@ namespace Backend
                     Utils.WriteLog($"Received agent connect from {agentUrl}.", "info");
                     string agentsFilePath = Settings.Get("AGENTS_PATH");
 
-                    Utils.WriteLog($"Agent {agentUrl} is connecting...", "info");
-                    // lock code
+                    Utils.WriteLog($"Agent {agentUrl} is connecting...", "info");   
 
                     Utils.WriteLog($"Agent {agentUrl}: entering critical code...", "info");
                     // Init agents file when first agent is connecting
@@ -180,10 +179,7 @@ namespace Backend
                         url = url.Replace("127.0.0.1", "localhost");
                     }
 
-                    // lock code
-
                     Utils.WriteLog($"Received agent ready from {url}.", "info");
-
 
                     //_agents = Utils.ReadAgentsFromFile(agentsFilePath);
                     Agent agent = _agents.Find(a => a.URL == url);
@@ -255,6 +251,8 @@ namespace Backend
                     //Utils.WriteToFile(jsonFileByDevice, jsonContentByDevice, append: false);
                     Utils.WriteRecordsToCsv(csvFileByDevice, deviceResultsDict[deviceName]);
                 }
+
+                Utils.WriteLog($"Comparison files was received from agent {url}", "info");
             }
             catch (Exception ex)
             {
@@ -291,6 +289,7 @@ namespace Backend
                 string logFilePath = Path.Combine(deviceLogsDir, deviceName + "_log.txt");
 
                 Utils.WriteToFile(logFilePath, logContent, append: false);
+                Utils.WriteLog($"Log file was received from agent {url}", "info");
             }
             catch (Exception ex)
             {
