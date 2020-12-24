@@ -237,7 +237,7 @@ if __name__ == "__main__":
             print('Delta Devices AWS: {}'.format(deltaDevicesAws))
 
             InsertDevices(env, deltaDevicesCsv, config)
-            DeleteDevices(deltaDevicesAws, config) 
+            #DeleteDevices(deltaDevicesAws, config) 
             #DeleteDevices(csvDeviceRecords, config)
 
             pass
