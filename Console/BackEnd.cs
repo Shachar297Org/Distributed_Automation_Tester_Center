@@ -17,6 +17,12 @@ namespace Backend
         List<Device> _devices = null;
         Logger _logger;
 
+        enum DeviceData
+        {
+            commands,
+            events
+        }
+
         /// <summary>
         /// Initialize backend:
         /// Create two timers - first agent connection and ready timers
@@ -35,8 +41,15 @@ namespace Backend
                 _getAgentReadyTimer.Elapsed += GetAgentReadyTimer_Elapsed;
                 _getAgentConnectTimer.Start();
 
-                InitAgents();
-                InsertDevicesToPortal(Settings.Get("CONFIG_FILE"));
+                //InitAgents();
+                InsertDevicesToPortal(Settings.Get("CONFIG_FILE"), 1);
+
+                //DeleteDeviceDataFromPortal("999", "GA-0005200", Settings.Get("CONFIG_FILE"), DeviceData.events, new DateTime(2020, 7, 1, 8, 8, 50), new DateTime(2020, 7, 29, 8, 9, 0));
+                //DeleteDeviceDataFromPortal("999", "GA-0005200", Settings.Get("CONFIG_FILE"), DeviceData.commands, new DateTime(2020, 7, 1, 8, 8, 50), new DateTime(2020, 9, 29, 8, 9, 0));
+                //DeleteDeviceDataFromPortal("VOLODYMYR-TEST-5", "GA-0000180", Settings.Get("CONFIG_FILE"), DeviceData.events, new DateTime(2020, 12, 17, 18, 0, 0), new DateTime(2020, 12, 24, 18, 0, 0));
+                //DeleteDeviceDataFromPortal("VOLODYMYR-TEST-5", "GA-0000180", Settings.Get("CONFIG_FILE"), DeviceData.commands, new DateTime(2020, 12, 17, 18, 0, 0), new DateTime(2020, 12, 24, 18, 0, 0));
+                //DeleteDeviceFromPortal("VOLODYMYR-TEST-6", "GA-0000180", Settings.Get("CONFIG_FILE"));
+
                 //InsertDevicesToPortal(Settings.Get("ENV"), Settings.Get("DEVICES_PATH"));
                 //CollectAWSServices(Settings.Get("ENV"));
                 //CollectAWSInstances();
@@ -113,7 +126,7 @@ namespace Backend
                 }
                 if (Settings.Get("MODE").ToLower() == "debug")
                 {
-                    agentUrl = agentUrl.Replace("127.0.0.1", "localhost");
+                    agentUrl = agentUrl.Replace("127.0.0.1", "localhost").Replace("::1", "localhost");
                 }
                 string[] urlStrings = agentUrl.Split(':');
                 _logger.WriteLog($"Adding agent {agentUrl} to pool.", "info");
@@ -140,7 +153,7 @@ namespace Backend
             {
                 if (Settings.Get("MODE").ToLower() == "debug")
                 {
-                    url = url.Replace("127.0.0.1", "localhost");
+                    url = url.Replace("127.0.0.1", "localhost").Replace("::1", "localhost");
                 }
 
                 _logger.WriteLog($"Received agent ready from {url}.", "info");
@@ -168,7 +181,7 @@ namespace Backend
             {
                 if (Settings.Get("MODE").ToLower() == "debug")
                 {
-                    url = url.Replace("127.0.0.1", "localhost");
+                    url = url.Replace("127.0.0.1", "localhost").Replace("::1", "localhost");
                 }
 
                 List<Event> events = JsonConvert.DeserializeObject<List<Event>>(jsonContent);
@@ -233,7 +246,7 @@ namespace Backend
             {
                 if (Settings.Get("MODE").ToLower() == "debug")
                 {
-                    url = url.Replace("127.0.0.1", "localhost");
+                    url = url.Replace("127.0.0.1", "localhost").Replace("::1", "localhost");
                 }
 
                 string deviceLogsDir = Settings.Get("DEVICE_LOGS_DIR");
@@ -284,7 +297,7 @@ namespace Backend
         /// </summary>
         /// <param name="env">env value (dev/staging/int)</param>
         /// <param name="devicesCsvFile">csv file containing devices to insert</param>
-        private void InsertDevicesToPortal(string configFile)
+        private void InsertDevicesToPortal(string configFile, int strategy)
         {
             try
             {
@@ -292,7 +305,7 @@ namespace Backend
                 string pythonScriptsFolder = Settings.Get("PYTHON_SCRIPTS_PATH");
                 string pythonExePath = Settings.Get("PYTHON");
                 _logger.WriteLog($"Python exe path: {pythonExePath}", "info");
-                int returnCode = Utils.RunCommand(pythonExePath, "insert_devices.py", $"{configFile}", pythonScriptsFolder, Settings.Get("OUTPUT"));
+                int returnCode = Utils.RunCommand(pythonExePath, "insert_devices.py", $"{configFile} {strategy}", pythonScriptsFolder, Settings.Get("OUTPUT"));
                 Utils.WriteToFile(Settings.Get("RETURN_CODE"), returnCode.ToString(), false);
             }
             catch (Exception ex)
@@ -317,6 +330,58 @@ namespace Backend
                 _logger.WriteLog($"Error in distributeDevices: {ex.Message} {ex.StackTrace}", "error");
             }
         }
+
+        /// <summary>
+        /// Delete device data from portal
+        /// 
+        /// </summary>
+        /// <param name="type">env value (devices/events/commands)</param>
+        private void DeleteDeviceDataFromPortal(string deviceSerialNumber, string deviceType, string configFile, DeviceData dataType,  DateTime fromDate, DateTime toDate)
+        {
+            try
+            {
+                var fromDateStr = fromDate.ToString("s", System.Globalization.CultureInfo.InvariantCulture);
+                var toDateStr = toDate.ToString("s", System.Globalization.CultureInfo.InvariantCulture);
+
+                _logger.WriteLog($"Deleting {dataType} from portal.", "info");
+                if (!string.IsNullOrEmpty(fromDateStr) && !string.IsNullOrEmpty(toDateStr)) 
+                    _logger.WriteLog($"From date {fromDate} to date {toDate}", "info");
+
+                string pythonScriptsFolder = Settings.Get("PYTHON_SCRIPTS_PATH");
+                string pythonExePath = Settings.Get("PYTHON");
+                _logger.WriteLog($"Python exe path: {pythonExePath}", "info");
+                int returnCode = Utils.RunCommand(pythonExePath, "delete_device.py", $"{deviceSerialNumber} {deviceType} {configFile} {dataType} {fromDateStr} {toDateStr}", pythonScriptsFolder, Settings.Get("OUTPUT"));
+                Utils.WriteToFile(Settings.Get("RETURN_CODE"), returnCode.ToString(), false);
+            }
+            catch (Exception ex)
+            {
+                _logger.WriteLog($"Error in DeleteDeviceDataFromPortal: {ex.Message} {ex.StackTrace}", "error");
+            }
+        }
+
+        /// <summary>
+        /// Delete device from portal
+        /// 
+        /// </summary>
+        /// <param name="type">env value (devices/events/commands)</param>
+        private void DeleteDeviceFromPortal(string deviceSerialNumber, string deviceType, string configFile)
+        {
+            try
+            {
+                _logger.WriteLog($"Deleting device from portal.", "info");
+                
+                string pythonScriptsFolder = Settings.Get("PYTHON_SCRIPTS_PATH");
+                string pythonExePath = Settings.Get("PYTHON");
+                _logger.WriteLog($"Python exe path: {pythonExePath}", "info");
+                int returnCode = Utils.RunCommand(pythonExePath, "delete_device.py", $"{deviceSerialNumber} {deviceType} {configFile}", pythonScriptsFolder, Settings.Get("OUTPUT"));
+                Utils.WriteToFile(Settings.Get("RETURN_CODE"), returnCode.ToString(), false);
+            }
+            catch (Exception ex)
+            {
+                _logger.WriteLog($"Error in DeleteDeviceFromPortal: {ex.Message} {ex.StackTrace}", "error");
+            }
+        }
+
 
         /// <summary>
         /// Send automation script only to agents with Ready status

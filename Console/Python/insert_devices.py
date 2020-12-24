@@ -73,6 +73,58 @@ def CollectDevicesFromPortal(config: object):
     return deviceRecords
 
 
+
+def CollectDevicesFromPortalByAPI(config: object, limit=0, page=0, searchQuery=''):
+    """
+    Collect devices list from the portal by API and return list of their records {GA, SN}
+    """
+    accessToken = SendRequestLogin(config)
+    
+    if not accessToken:
+        print('Error: Login failed.')
+        return
+    print('Login success. ')
+
+    response = None
+
+    if limit == 0 and page == 0:
+        host = config['API_GET_DEVICES_URL'] + '?limit=1&page=0&search={}'.format(searchQuery)
+        
+        response = requests.get(url=host, headers={'Content-Type': 'application/json', 'Authorization': 'Bearer {}'.format(
+            accessToken)})
+
+        totalResults = None
+        
+        if response.ok:
+            totalResults = response.json()['metadata']['page']['totalResults']
+            print("total: {}".format(totalResults))
+            host = config['API_GET_DEVICES_URL'] + '?limit={}&page=0&search={}'.format(totalResults, searchQuery)
+
+            print('host: {}'.format(host))
+            response = requests.get(url=host, headers={'Content-Type': 'application/json', 'Authorization': 'Bearer {}'.format(
+            accessToken)})
+    else:
+        host = config['API_GET_DEVICES_URL'] + '?limit={0}&page={1}&search={2}'.format(limit, page, searchQuery)
+        print('host: {}'.format(host))
+
+        response = requests.get(url=host, headers={'Content-Type': 'application/json', 'Authorization': 'Bearer {}'.format(
+        accessToken)})
+
+    if response and response.ok:
+        print('Devices were retrieved successfully.')
+    else:
+        print('Error: cannot retrieve the devices. status code: {}. {}'.format(response.status_code, response.text))
+
+    devices = []
+    for device_json in response.json()['data']:
+        device = device_json['deviceInfo']
+        devices.append({'deviceType': device['deviceType'], 'deviceSerialNumber': device['deviceSerialNumber']})
+
+    return devices
+
+
+
+
 def SendRequestLogin(config: object):
     """
     Sends to api host login request and return access token
@@ -141,13 +193,14 @@ if __name__ == "__main__":
     from utils import *
     from sql import *
     from record import *
+    from delete_device import DeleteDevices
 
     print('-----insert_devices-----')
     print('Arguments: {}'.format(sys.argv))
 
     try:
-        if len(sys.argv) != 2:
-            print('Enter 1 arguments: config file')
+        if len(sys.argv) != 3:
+            print('Enter 2 arguments: config file and strategy')
             exit(1)
 
         configFile = sys.argv[1]
@@ -157,6 +210,8 @@ if __name__ == "__main__":
             print('Config file {} not exist'.format(configFile))
             exit(2)
 
+        strategy = int(sys.argv[2]) if sys.argv[2] else 3
+
         config = LoadConfigText(configFile)
 
         devicesCsvFile = config['DEVICES_PATH']
@@ -165,14 +220,42 @@ if __name__ == "__main__":
         print('Devices csv file: {}'.format(devicesCsvFile))
         print('Env: {}'.format(env))
 
-        portalDeviceRecords = CollectDevicesFromPortal(config)
+        portalDeviceRecords = CollectDevicesFromPortalByAPI(config)
 
-        print('Devices: {}'.format(portalDeviceRecords))
+        #print('Devices: {}'.format(portalDeviceRecords))
 
-        csvDeviceRecords = ReadRecordsFromCsvFile(devicesCsvFile)
-        deltaDevices = GetDeltaDevices(csvDeviceRecords, portalDeviceRecords)
+        csvDeviceRecords = ReadRecordsFromCsvFile(devicesCsvFile)      
 
-        InsertDevices(env, deltaDevices, config)
+        if strategy == 1:
+            # insert missing from csv
+            # delete not needed devices on aws
+
+            deltaDevicesCsv = GetDeltaDevices(csvDeviceRecords, portalDeviceRecords)
+            print('Delta Devices CSV: {}'.format(deltaDevicesCsv))
+            
+            deltaDevicesAws = GetDeltaDevices(portalDeviceRecords, csvDeviceRecords)
+            print('Delta Devices AWS: {}'.format(deltaDevicesAws))
+
+            InsertDevices(env, deltaDevicesCsv, config)
+            DeleteDevices(deltaDevicesAws, config) 
+            #DeleteDevices(csvDeviceRecords, config)
+
+            pass
+        elif strategy == 2:
+            # delete all from aws
+            # insert all from csv
+
+            #DeleteDevices(portalDeviceRecords, config)
+            #InsertDevices(env, csvDeviceRecords, config)
+
+            pass
+        elif strategy == 3:
+            # insert missing from csv
+ 
+            deltaDevicesCsv = GetDeltaDevices(csvDeviceRecords, portalDeviceRecords)
+            print('Delta Devices CSV: {}'.format(deltaDevicesCsv))
+ 
+            InsertDevices(env, deltaDevicesCsv, config)
 
         print('-----success-----')
 
