@@ -1,60 +1,18 @@
-
-
-def ConnectRDS(host: str, db: str, username: str, password: str):
-    """
-    Connect to RDS and return connection object
-    """
-    dbConn = None
-    try:
-        dbConn = DbConnector(host, db, username, password)
-        if dbConn:
-            return dbConn
-        else:
-            return None
-    except Exception as ex:
-        print(ex)
-        return None
-
-
-def GetDeviceEntries(dbConn: object):
-    """
-    Return all device entries from database
-    """
-    tableName = '.'.join(['DeviceService', 'Devices'])
-    query = "SELECT * FROM {} as devices left join DeviceService.BaseDevice as baseDevices on devices.manufacturerId=baseDevices.manufacturerId".format(
-        tableName)
-    resultsSet = dbConn.ExecuteQuery(tableName, query)
-    return resultsSet
-
-
-def RetrieveDevicesFromPortal(config: object):
+def RetrieveDevicesFromPortal(config: object, limit: int):
     """
     Retrieve device list from portal and return list of their records {GA, SN}
     """
-    simFlag = True if config['RDS_SIM'] == 'True' else False
-    if simFlag:
-        return [
-            {'deviceType': 'GA-0000080CN', 'deviceSerialNumber': 'ELAD-TEST-1'},
-            {'deviceType': 'GA-0000080CN', 'deviceSerialNumber': 'ELAD-TEST-2'},
-            {'deviceType': 'GA-0000080CN', 'deviceSerialNumber': 'ELAD-TEST-3'},
-            {'deviceType': 'GA-0000080CN', 'deviceSerialNumber': 'ELAD-TEST-4'},
-            {'deviceType': 'GA-0000080CN', 'deviceSerialNumber': 'ELAD-TEST-5'},
-            {'deviceType': 'GA-0000080CN', 'deviceSerialNumber': 'ELAD-TEST-6'},
-            {'deviceType': 'GA-0000080CN', 'deviceSerialNumber': 'ELAD-TEST-7'},
-            {'deviceType': 'GA-0000080CN', 'deviceSerialNumber': 'ELAD-TEST-8'},
-            {'deviceType': 'GA-0000180', 'deviceSerialNumber': 'ELAD-TEST-9'},
-            {'deviceType': 'GA-0000180', 'deviceSerialNumber': 'ELAD-TEST-10'},
-            {'deviceType': 'GA-0000180', 'deviceSerialNumber': 'ELAD-TEST-11'},
-            {'deviceType': 'GA-0000080CN', 'deviceSerialNumber': 'ELAD-TEST-12'},
-        ]
+    rdsSim = True if config['RDS_SIMUL'] == 'True' else False
+    if rdsSim:
+        return [], None
 
     accessToken = SendRequestLogin(config)
     if not accessToken:
         print('Error: Login failed.')
-        return
+        raise Exception('Cannot login portal')
     print('Login success.')
 
-    getDeviceHost = config['API_SEARCH_DEVICE']
+    getDeviceHost = '?limit='.join([config['API_SEARCH_DEVICE'], str(limit)])
     response = requests.get(url=getDeviceHost, headers={'Content-Type': 'application/json', 'Authorization': 'Bearer {}'.format(
         accessToken)})
     if response.ok:
@@ -74,46 +32,6 @@ def RetrieveDevicesFromPortal(config: object):
             response.status_code))
         raise Exception('Error: {}: {}'.format(
             response.status_code, response.text))
-
-
-def CollectDevicesFromPortalOld(config: object):
-    """
-    Collect devices list from the portal and return list of their records {GA, SN}
-    """
-    host = config['RDS_HOST']
-    db = config['RDS_DB']
-    username = config['RDS_USER']
-    password = config['RDS_PASS']
-
-    # Connect to RDS
-    simFlag = True if config['RDS_SIM'] == 'True' else False
-    if simFlag:
-        return [
-            {'deviceType': 'GA-0000080CN', 'deviceSerialNumber': 'ELAD-TEST-1'},
-            {'deviceType': 'GA-0000080CN', 'deviceSerialNumber': 'ELAD-TEST-2'},
-            {'deviceType': 'GA-0000080CN', 'deviceSerialNumber': 'ELAD-TEST-3'},
-            {'deviceType': 'GA-0000080CN', 'deviceSerialNumber': 'ELAD-TEST-4'},
-            {'deviceType': 'GA-0000080CN', 'deviceSerialNumber': 'ELAD-TEST-5'},
-            {'deviceType': 'GA-0000080CN', 'deviceSerialNumber': 'ELAD-TEST-6'},
-            {'deviceType': 'GA-0000080CN', 'deviceSerialNumber': 'ELAD-TEST-7'},
-            {'deviceType': 'GA-0000080CN', 'deviceSerialNumber': 'ELAD-TEST-8'},
-            {'deviceType': 'GA-0000180', 'deviceSerialNumber': 'ELAD-TEST-9'},
-            {'deviceType': 'GA-0000180', 'deviceSerialNumber': 'ELAD-TEST-10'},
-            {'deviceType': 'GA-0000180', 'deviceSerialNumber': 'ELAD-TEST-11'},
-            {'deviceType': 'GA-0000080CN', 'deviceSerialNumber': 'ELAD-TEST-12'},
-        ]
-    else:
-        deviceRecords = []
-        dbConn = ConnectRDS(host, db, username, password)
-        if dbConn:
-            print('Connected to RDS.')
-            deviceEntries = GetDeviceEntries(dbConn)
-            deviceRecords = [ConvertEntryToDeviceRecord(
-                entry) for entry in deviceEntries]
-        else:
-            print('Error: Cannot connect to RDS.')
-
-    return deviceRecords
 
 
 def SendRequestLogin(config: object):
@@ -154,7 +72,11 @@ def GetDeltaDevices(devicesList1, devicesList2):
     """
     deltaDevices = []
     for deviceRec in devicesList1:
-        if deviceRec not in devicesList2:
+        deviceName1 = '_'.join(
+            [deviceRec['deviceSerialNumber'], deviceRec['deviceType']])
+        deviceNames = [
+            '_'.join([d2['deviceSerialNumber'], d2['deviceType']]) for d2 in devicesList2]
+        if deviceName1 not in deviceNames:
             deltaDevices.append(deviceRec)
     return deltaDevices
 
@@ -164,6 +86,10 @@ def InsertDevices(accessToken: str, env: str, deviceRecords: dict, config: objec
     Insert new devices from csv file to portal
     """
     #accessToken = SendRequestLogin(config)
+    rdsSim = True if config['RDS_SIMUL'] == 'True' else False
+    if rdsSim:
+        print('Simulating RDS.')
+        return
     if not accessToken:
         print('Error: Login failed.')
         return
@@ -209,15 +135,15 @@ if __name__ == "__main__":
         print('Devices csv file: {}'.format(devicesCsvFile))
         print('Env: {}'.format(env))
 
-        portalDeviceRecords, accessToken = RetrieveDevicesFromPortal(config)
+        portalDeviceRecords, accessToken = RetrieveDevicesFromPortal(
+            config, 300)
         print('Devices in portal: {}'.format(len(portalDeviceRecords)))
 
         csvDeviceRecords = ReadRecordsFromCsvFile(devicesCsvFile)
+
         newDevices = GetDeltaDevices(csvDeviceRecords, portalDeviceRecords)
 
-        print('New devices:')
-        for deltaDevice in newDevices:
-            print(deltaDevice)
+        print('New devices: {}'.format(len(newDevices)))
 
         InsertDevices(accessToken, env, newDevices, config)
 

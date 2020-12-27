@@ -40,6 +40,7 @@ if __name__ == "__main__":
 
     import sys
     import requests
+    import traceback
     from utils import *
 
     print('-----distribute_devices-----')
@@ -69,5 +70,6 @@ if __name__ == "__main__":
 
     except Exception as ex:
         print('Error: {}'.format(ex))
+        traceback.print_exc()
         print('-----fail-----')
         exit(1)
