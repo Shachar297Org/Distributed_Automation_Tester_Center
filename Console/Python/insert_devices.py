@@ -210,7 +210,8 @@ if __name__ == "__main__":
             print('Config file {} not exist'.format(configFile))
             exit(2)
 
-        strategy = int(sys.argv[2]) if sys.argv[2] else 3
+        strategy = sys.argv[2] if sys.argv[2] else 'union'
+        print('Strategy: ' + strategy)
 
         config = LoadConfigText(configFile)
 
@@ -226,7 +227,7 @@ if __name__ == "__main__":
 
         csvDeviceRecords = ReadRecordsFromCsvFile(devicesCsvFile)      
 
-        if strategy == 1:
+        if strategy == 'intersect':
             # insert missing from csv
             # delete not needed devices on aws
 
@@ -241,7 +242,7 @@ if __name__ == "__main__":
             #DeleteDevices(csvDeviceRecords, config)
 
             pass
-        elif strategy == 2:
+        elif strategy == 'all_new':
             # delete all from aws
             # insert all from csv
 
@@ -249,7 +250,7 @@ if __name__ == "__main__":
             #InsertDevices(env, csvDeviceRecords, config)
 
             pass
-        elif strategy == 3:
+        elif strategy == 'union':
             # insert missing from csv
  
             deltaDevicesCsv = GetDeltaDevices(csvDeviceRecords, portalDeviceRecords)

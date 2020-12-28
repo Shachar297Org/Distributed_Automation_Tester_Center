@@ -23,6 +23,13 @@ namespace Backend
             events
         }
 
+        enum InsertionStrategy
+        {
+            intersect,
+            all_new,
+            union
+        }
+
         /// <summary>
         /// Initialize backend:
         /// Create two timers - first agent connection and ready timers
@@ -42,7 +49,7 @@ namespace Backend
                 _getAgentConnectTimer.Start();
 
                 //InitAgents();
-                InsertDevicesToPortal(Settings.Get("CONFIG_FILE"), 1);
+                InsertDevicesToPortal(Settings.Get("CONFIG_FILE"), InsertionStrategy.union);
 
                 //DeleteDeviceDataFromPortal("999", "GA-0005200", Settings.Get("CONFIG_FILE"), DeviceData.events, new DateTime(2020, 7, 1, 8, 8, 50), new DateTime(2020, 7, 29, 8, 9, 0));
                 //DeleteDeviceDataFromPortal("999", "GA-0005200", Settings.Get("CONFIG_FILE"), DeviceData.commands, new DateTime(2020, 7, 1, 8, 8, 50), new DateTime(2020, 9, 29, 8, 9, 0));
@@ -297,7 +304,7 @@ namespace Backend
         /// </summary>
         /// <param name="env">env value (dev/staging/int)</param>
         /// <param name="devicesCsvFile">csv file containing devices to insert</param>
-        private void InsertDevicesToPortal(string configFile, int strategy)
+        private void InsertDevicesToPortal(string configFile, InsertionStrategy strategy)
         {
             try
             {
