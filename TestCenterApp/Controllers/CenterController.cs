@@ -11,6 +11,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Text;
+using System.Threading.Tasks;
 using System.Web;
 using System.Web.Http;
 using System.Web.Http.Results;
@@ -41,12 +42,12 @@ namespace TestCenterApp.Controllers
         // GET: connect?port=<port>
         [HttpGet]
         [Route("connect")]
-        public HttpResponseMessage Connect(int port)
+        public async Task<HttpResponseMessage> Connect(int port)
         {
             int agentPort = port;
             string agentIP = HttpContext.Current.Request.ServerVariables["REMOTE_ADDR"];
             string agentUrl = string.Join(":", agentIP, agentPort);
-            bool result = backEnd.Connect(agentUrl);
+            bool result = await backEnd.Connect(agentUrl);
 
             if (result)
             {
@@ -67,14 +68,14 @@ namespace TestCenterApp.Controllers
         // GET: connect?port=<port>
         [HttpGet]
         [Route("agentReady")]
-        public HttpResponseMessage AgentReady(string port)
+        public async Task<HttpResponseMessage> AgentReady(string port)
         {
             string agentPort = port;
             string agentIP = HttpContext.Current.Request.ServerVariables["REMOTE_ADDR"];
             string url = string.Join(":", agentIP, agentPort);
             try
             {
-                backEnd.AgentReady(url);
+                bool result = await backEnd.AgentReady(url);
                 string msg = $"Agent-{agentPort} status was updated to Ready";
                 var response = Request.CreateResponse(HttpStatusCode.Conflict);
                 response.Content = new StringContent(("{result:" + msg + "}"), Encoding.UTF8, "application/json");
@@ -92,14 +93,14 @@ namespace TestCenterApp.Controllers
         // POST: getScriptLog
         [HttpPost]
         [Route("getScriptLog")]
-        public HttpResponseMessage GetScriptLog()
+        public async Task<HttpResponseMessage> GetScriptLog()
         {
             string agentIP = HttpContext.Current.Request.ServerVariables["REMOTE_ADDR"];
             HttpContent requestContent = Request.Content;
             try
             {
                 string jsonContent = requestContent.ReadAsStringAsync().Result;
-                backEnd.GetScriptLog(agentIP, jsonContent);
+                await backEnd.GetScriptLog(agentIP, jsonContent);
                 string msg = "Script log was received";
                 var response = Request.CreateResponse(HttpStatusCode.OK);
                 response.Content = new StringContent(("{result:" + msg + "}"), Encoding.UTF8, "application/json");
@@ -117,14 +118,14 @@ namespace TestCenterApp.Controllers
         // POST: getComparisonResults
         [HttpPost]
         [Route("getComparisonResults")]
-        public HttpResponseMessage GetComparisonResults()
+        public async Task<HttpResponseMessage> GetComparisonResults()
         {
             string agentIP = HttpContext.Current.Request.ServerVariables["REMOTE_ADDR"];
             HttpContent requestContent = Request.Content;
             try
             {
                 string jsonContent = requestContent.ReadAsStringAsync().Result;
-                backEnd.GetComparisonResults(agentIP, jsonContent);
+                await backEnd.GetComparisonResults(agentIP, jsonContent);
                 string msg = "Comparison results were received";
                 var response = Request.CreateResponse(HttpStatusCode.OK);
                 response.Content = new StringContent(("{result:" + msg + "}"), Encoding.UTF8, "application/json");
@@ -137,6 +138,28 @@ namespace TestCenterApp.Controllers
                 response.Content = new StringContent(("{result:" + msg + "}"), Encoding.UTF8, "application/json");
                 return response;
             }
+        }
+
+        [HttpGet]
+        [Route("getAgents")]
+        public HttpResponseMessage GetAgents()
+        {
+            Utils.LoadConfig();
+            List<string> agents = backEnd.GetAgents();
+            string agentsString = string.Join(",", agents);
+            var response = Request.CreateResponse(HttpStatusCode.OK);
+            response.Content = new StringContent(("{agents:" + agentsString + ", count:" + agents.Count + "}"), Encoding.UTF8, "application/json");
+            return response;
+        }
+
+        [HttpGet]
+        [Route("Reset")]
+        public HttpResponseMessage Reset()
+        {
+            backEnd.Reset();
+            var response = Request.CreateResponse(HttpStatusCode.OK);
+            response.Content = new StringContent(("{Result: center was reset}"), Encoding.UTF8, "application/json");
+            return response;
         }
 
         [HttpGet]

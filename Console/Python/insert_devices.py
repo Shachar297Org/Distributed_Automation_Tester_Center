@@ -1,76 +1,38 @@
-
-
-def ConnectRDS(host: str, db: str, username: str, password: str):
+def RetrieveDevicesFromPortal(config: object, limit: int):
     """
-    Connect to RDS and return connection object
+    Retrieve device list from portal and return list of their records {GA, SN}
     """
-    dbConn = None
-    try:
-        dbConn = DbConnector(host, db, username, password)
-        if dbConn:
-            return dbConn
-        else:
-            return None
-    except Exception as ex:
-        print(ex)
-        return None
+    rdsSim = True if config['RDS_SIMUL'] == 'True' else False
+    if rdsSim:
+        return [], None
 
+    accessToken = SendRequestLogin(config)
+    if not accessToken:
+        print('Error: Login failed.')
+        raise Exception('Cannot login portal')
+    print('Login success.')
 
-def GetDeviceEntries(dbConn: object):
-    """
-    Return all device entries from database
-    """
-    tableName = '.'.join(['DeviceService', 'Devices'])
-    query = "SELECT * FROM {} as devices left join DeviceService.BaseDevice as baseDevices on devices.manufacturerId=baseDevices.manufacturerId".format(
-        tableName)
-    resultsSet = dbConn.ExecuteQuery(tableName, query)
-    return resultsSet
-
-
-def CollectDevicesFromPortal(config: object):
-    """
-    Collect devices list from the portal and return list of their records {GA, SN}
-    """
-    host = config['RDS_HOST']
-    db = config['RDS_DB']
-    username = config['RDS_USER']
-    password = config['RDS_PASS']
-
-    # Connect to RDS
-    simFlag = True if config['RDS_SIM'] == 'True' else False
-    if simFlag:
-        return [
-            {'deviceType': 'GA-0000080CN', 'deviceSerialNumber': 'ELAD-TEST-1'},
-            {'deviceType': 'GA-0000080CN', 'deviceSerialNumber': 'ELAD-TEST-2'},
-            {'deviceType': 'GA-0000080CN', 'deviceSerialNumber': 'ELAD-TEST-3'},
-            {'deviceType': 'GA-0000080CN', 'deviceSerialNumber': 'ELAD-TEST-4'},
-            {'deviceType': 'GA-0000080CN', 'deviceSerialNumber': 'ELAD-TEST-5'},
-            {'deviceType': 'GA-0000080CN', 'deviceSerialNumber': 'ELAD-TEST-6'},
-            {'deviceType': 'GA-0000080CN', 'deviceSerialNumber': 'ELAD-TEST-7'},
-            {'deviceType': 'GA-0000080CN', 'deviceSerialNumber': 'ELAD-TEST-8'},
-            {'deviceType': 'GA-0000180', 'deviceSerialNumber': 'ELAD-TEST-9'},
-            {'deviceType': 'GA-0000180', 'deviceSerialNumber': 'ELAD-TEST-10'},
-            {'deviceType': 'GA-0000180', 'deviceSerialNumber': 'ELAD-TEST-11'},
-            {'deviceType': 'GA-0000080CN', 'deviceSerialNumber': 'ELAD-TEST-12'},
-            {'deviceType': 'GA-0000180',
-                'deviceSerialNumber': 'ELAD-TEST-13'},  # new
-            {'deviceType': 'GA-0000180',
-                'deviceSerialNumber': 'ELAD-TEST-14'},  # new
-            {'deviceType': 'GA-0000180',
-                'deviceSerialNumber': 'ELAD-TEST-15'},  # new
-        ]
-    else:
+    getDeviceHost = '?limit='.join([config['API_SEARCH_DEVICE'], str(limit)])
+    response = requests.get(url=getDeviceHost, headers={'Content-Type': 'application/json', 'Authorization': 'Bearer {}'.format(
+        accessToken)})
+    if response.ok:
+        print('Devices list was retrieved successfully.')
+        jsonObj = response.json()
+        jsonData = jsonObj['data']
         deviceRecords = []
-        dbConn = ConnectRDS(host, db, username, password)
-        if dbConn:
-            print('Connected to RDS.')
-            deviceEntries = GetDeviceEntries(dbConn)
-            deviceRecords = [ConvertEntryToDeviceRecord(
-                entry) for entry in deviceEntries]
-        else:
-            print('Error: Cannot connect to RDS.')
+        for jsonDeviceObj in jsonData:
+            deviceType = jsonDeviceObj['deviceInfo']['deviceType']
+            serialNum = jsonDeviceObj['deviceInfo']['deviceSerialNumber']
+            deviceRec = {'deviceType': deviceType,
+                         'deviceSerialNumber': serialNum}
+            deviceRecords.append(deviceRec)
+        return deviceRecords, accessToken
+    else:
+        print('Error: cannot retreive devices from portal. status code: {}.'.format(
+            response.status_code))
+        raise Exception('Error: {}: {}'.format(
+            response.status_code, response.text))
 
-    return deviceRecords
 
 
 
@@ -120,10 +82,7 @@ def CollectDevicesFromPortalByAPI(config: object, limit=0, page=0, searchQuery='
         device = device_json['deviceInfo']
         devices.append({'deviceType': device['deviceType'], 'deviceSerialNumber': device['deviceSerialNumber']})
 
-    return devices
-
-
-
+    return devices, accessToken
 
 def SendRequestLogin(config: object):
     """
@@ -163,16 +122,24 @@ def GetDeltaDevices(devicesList1, devicesList2):
     """
     deltaDevices = []
     for deviceRec in devicesList1:
-        if deviceRec not in devicesList2:
+        deviceName1 = '_'.join(
+            [deviceRec['deviceSerialNumber'], deviceRec['deviceType']])
+        deviceNames = [
+            '_'.join([d2['deviceSerialNumber'], d2['deviceType']]) for d2 in devicesList2]
+        if deviceName1 not in deviceNames:
             deltaDevices.append(deviceRec)
     return deltaDevices
 
 
-def InsertDevices(env: str, deviceRecords: dict, config: object):
+def InsertDevices(accessToken: str, env: str, deviceRecords: dict, config: object):
     """
     Insert new devices from csv file to portal
     """
-    accessToken = SendRequestLogin(config)
+    #accessToken = SendRequestLogin(config)
+    rdsSim = True if config['RDS_SIMUL'] == 'True' else False
+    if rdsSim:
+        print('Simulating RDS.')
+        #return
     if not accessToken:
         print('Error: Login failed.')
         return
@@ -190,6 +157,7 @@ if __name__ == "__main__":
     import requests
     import json
     import configparser
+    import traceback
     from utils import *
     from sql import *
     from record import *
@@ -221,7 +189,7 @@ if __name__ == "__main__":
         print('Devices csv file: {}'.format(devicesCsvFile))
         print('Env: {}'.format(env))
 
-        portalDeviceRecords = CollectDevicesFromPortalByAPI(config)
+        portalDeviceRecords, accessToken = CollectDevicesFromPortalByAPI(config)
 
         #print('Devices: {}'.format(portalDeviceRecords))
 
@@ -237,17 +205,17 @@ if __name__ == "__main__":
             deltaDevicesAws = GetDeltaDevices(portalDeviceRecords, csvDeviceRecords)
             print('Delta Devices AWS: {}'.format(deltaDevicesAws))
 
-            InsertDevices(env, deltaDevicesCsv, config)
-            #DeleteDevices(deltaDevicesAws, config) 
-            #DeleteDevices(csvDeviceRecords, config)
+            InsertDevices(accessToken, env, deltaDevicesCsv, config)
+            #DeleteDevices(accessToken, deltaDevicesAws, config) 
+            #DeleteDevices(accessToken, csvDeviceRecords, config)
 
             pass
         elif strategy == 'all_new':
             # delete all from aws
             # insert all from csv
 
-            #DeleteDevices(portalDeviceRecords, config)
-            #InsertDevices(env, csvDeviceRecords, config)
+            #DeleteDevices(accessToken, portalDeviceRecords, config)
+            #InsertDevices(accessToken, env, csvDeviceRecords, config)
 
             pass
         elif strategy == 'union':
@@ -256,11 +224,24 @@ if __name__ == "__main__":
             deltaDevicesCsv = GetDeltaDevices(csvDeviceRecords, portalDeviceRecords)
             print('Delta Devices CSV: {}'.format(deltaDevicesCsv))
  
-            InsertDevices(env, deltaDevicesCsv, config)
+            InsertDevices(accessToken, env, deltaDevicesCsv, config)
+
+        # Insert devices by Elad
+        #portalDeviceRecords, accessToken = RetrieveDevicesFromPortal(
+        #    config, 300)
+        #print('Devices in portal: {}'.format(len(portalDeviceRecords)))
+        #
+        #csvDeviceRecords = ReadRecordsFromCsvFile(devicesCsvFile)
+        #
+        #newDevices = GetDeltaDevices(csvDeviceRecords, portalDeviceRecords)
+        #
+        #print('New devices: {}'.format(len(newDevices)))
+        #
+        #InsertDevices(accessToken, env, newDevices, config)
 
         print('-----success-----')
-
     except Exception as ex:
         print('Error: {}'.format(ex))
+        traceback.print_exc()
         print('-----fail-----')
         exit(1)

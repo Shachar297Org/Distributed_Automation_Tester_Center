@@ -47,6 +47,20 @@ namespace TestCenterApp
                defaults: new { controller = "Center", action = "GetComparisonResults", id = UrlParameter.Optional },
                constraints: new { httpMethod = new HttpMethodConstraint("POST") }
            );
+
+            routes.MapRoute(
+               name: "GetAgents",
+               url: "{controller}/{action}/{id}",
+               defaults: new { controller = "Center", action = "GetAgents", id = UrlParameter.Optional },
+               constraints: new { httpMethod = new HttpMethodConstraint("GET") }
+           );
+
+            routes.MapRoute(
+               name: "Reset",
+               url: "{controller}/{action}/{id}",
+               defaults: new { controller = "Center", action = "Reset", id = UrlParameter.Optional },
+               constraints: new { httpMethod = new HttpMethodConstraint("GET") }
+           );
         }
     }
 }

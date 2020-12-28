@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -8,16 +9,19 @@ namespace Shared
 {
     public interface IBackEndInterfaces
     {
-        bool Connect(string url);
+        Task<bool> Connect(string url);
 
-        void AgentReady(string url);
+        Task<bool> AgentReady(string url);
 
-        void GetScriptLog(string url, string jsonContent);
+        Task GetScriptLog(string url, string jsonContent);
 
-        void GetComparisonResults(string url, string jsonContent);
+        Task GetComparisonResults(string url, string jsonContent);
 
-        bool Init();
+        void Init();
 
         string TestCommand(string num);
+
+        List<string> GetAgents();
+        void Reset();
     }
 }

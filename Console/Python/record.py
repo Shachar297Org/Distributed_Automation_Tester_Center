@@ -29,7 +29,7 @@ class Record:
         """
         Return toString value of the record
         """
-        return ','.join([self.deviceType, str(self.serialNum), self.entryKey, self.entryValue, self.entryTimeStamp])
+        return ','.join([str(self.deviceType), str(self.serialNum), str(self.entryKey), str(self.entryValue), str(self.entryTimeStamp)])
 
     def Hash(self):
         """

@@ -21,14 +21,14 @@ def SendRequestLogin(config: object):
     return jsonObj['accessToken']
 
 
-def DeleteDevices(devicesList, config: object):
+def DeleteDevices(accessToken: str, devicesList, config: object):
     for device in devicesList:
-        DeleteDevice(device['deviceSerialNumber'], device['deviceType'], config)
+        DeleteDevice(accessToken, device['deviceSerialNumber'], device['deviceType'], config)
 
 
-def DeleteDevice(deviceSerialNumber: str, deviceType: str, config: object):
+def DeleteDevice(accessToken: str, deviceSerialNumber: str, deviceType: str, config: object):
     deviceName = '_'.join([deviceSerialNumber, deviceType])
-    accessToken = SendRequestLogin(config)
+    #accessToken = SendRequestLogin(config)
     if not accessToken:
         print('Error: Login failed.')
         return
@@ -47,9 +47,9 @@ def DeleteDevice(deviceSerialNumber: str, deviceType: str, config: object):
             deviceName, response.status_code, response.text))
     
 
-def DeleteDeviceData(deviceSerialNumber: str, deviceType: str, config: object, dataType: str, fromDate: str, toDate: str):
+def DeleteDeviceData(accessToken: str, deviceSerialNumber: str, deviceType: str, config: object, dataType: str, fromDate: str, toDate: str):
     deviceName = '_'.join([deviceSerialNumber, deviceType])
-    accessToken = SendRequestLogin(config)
+    #accessToken = SendRequestLogin(config)
     
     if not accessToken:
         print('Error: Login failed.')
@@ -104,15 +104,16 @@ if __name__ == "__main__":
             exit(2)
 
         config = LoadConfigText(configFile)
+        accessToken = SendRequestLogin(config)
 
         if len(sys.argv) == 7:
             dataType = sys.argv[4]
             fromDate = sys.argv[5]
             toDate = sys.argv[6]
         
-            DeleteDeviceData(deviceSerialNumber, deviceType, config, dataType, fromDate, toDate)
+            DeleteDeviceData(accessToken, deviceSerialNumber, deviceType, config, dataType, fromDate, toDate)
         else:
-            DeleteDevice(deviceSerialNumber, deviceType, config)
+            DeleteDevice(accessToken, deviceSerialNumber, deviceType, config)
 
         print('-----success-----')
     except Exception as ex:

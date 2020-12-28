@@ -50,9 +50,11 @@ namespace Backend
                // _getAgentReadyTimer = new System.Timers.Timer(new TimeSpan(0, 0, readyTimerSec).TotalMilliseconds);
                 _getAgentConnectTimer.Elapsed += GetAgentConnectTimer_Elapsed;
                 _getAgentReadyTimer.Elapsed += GetAgentReadyTimer_Elapsed;
+
                 _getAgentConnectTimer.Start();
                 Utils.WriteLog("Starting connect timer", "info");
 
+<<<<<<< HEAD
                 //InitAgents();
                 InsertDevicesToPortal(Settings.Get("CONFIG_FILE"), InsertionStrategy.union);
 
@@ -62,9 +64,13 @@ namespace Backend
                 //DeleteDeviceDataFromPortal("VOLODYMYR-TEST-5", "GA-0000180", Settings.Get("CONFIG_FILE"), DeviceData.commands, new DateTime(2020, 12, 17, 18, 0, 0), new DateTime(2020, 12, 24, 18, 0, 0));
                 //DeleteDeviceFromPortal("VOLODYMYR-TEST-6", "GA-0000180", Settings.Get("CONFIG_FILE"));
 
+=======
+                //InitAgents(agentsFile);
+                InsertDevicesToPortal(Settings.Get("CONFIG_FILE"));
+>>>>>>> b415cfbdad446fb90c27c693aa29268fdc656da8
                 //InsertDevicesToPortal(Settings.Get("ENV"), Settings.Get("DEVICES_PATH"));
                 //CollectAWSServices(Settings.Get("ENV"));
-                //CollectAWSInstances();                
+                //CollectAWSInstances();
             }
             catch (Exception ex)
             {
@@ -153,7 +159,7 @@ namespace Backend
                     {
                         if (Settings.Get("MODE").ToLower() == "debug")
                         {
-                            agentUrl = agentUrl.Replace("127.0.0.1", "localhost").Replace("::1", "localhost");
+                            agentUrl = agentUrl.Replace("127.0.0.1", "localhost");
                         }
                         string[] urlStrings = agentUrl.Split(':');
                         Utils.WriteLog($"Adding agent {agentUrl} to pool.", "info");
@@ -175,7 +181,11 @@ namespace Backend
                 }
                 finally
                 {
+<<<<<<< HEAD
+                    agentUrl = agentUrl.Replace("127.0.0.1", "localhost").Replace("::1", "localhost");
+=======
                     Utils.WriteLog("finished Connect", "info");
+>>>>>>> b415cfbdad446fb90c27c693aa29268fdc656da8
                 }
             }
         }
@@ -193,9 +203,12 @@ namespace Backend
 
                 try
                 {
+<<<<<<< HEAD
+                    url = url.Replace("127.0.0.1", "localhost").Replace("::1", "localhost");
+=======
                     if (Settings.Get("MODE").ToLower() == "debug")
                     {
-                        url = url.Replace("127.0.0.1", "localhost").Replace("::1", "localhost");
+                        url = url.Replace("127.0.0.1", "localhost");
                     }
 
                     Utils.WriteLog($"Received agent ready from {url}.", "info");
@@ -210,18 +223,19 @@ namespace Backend
                     //Utils.WriteAgentListToFile(_agents, agentsFilePath);
 
                     return true;
+>>>>>>> b415cfbdad446fb90c27c693aa29268fdc656da8
                 }
                 catch (Exception ex)
                 {
                     Utils.WriteLog($"Error in agentReady: {ex.Message} {ex.StackTrace}", "error");
                     return false;
-                }                
+                }
             }
         }
 
         public async Task GetComparisonResults(string url, string jsonContent)
         {
-            Utils.LoadConfig();            
+            Utils.LoadConfig();
             try
             {
                 if (Settings.Get("MODE").ToLower() == "debug")
@@ -270,7 +284,8 @@ namespace Backend
                     //Utils.WriteToFile(jsonFileByDevice, jsonContentByDevice, append: false);
                     Utils.WriteRecordsToCsv(csvFileByDevice, deviceResultsDict[deviceName]);
                 }
-Utils.WriteLog($"Comparison files was received from agent {url}", "info");
+
+                Utils.WriteLog($"Comparison files was received from agent {url}", "info");
             }
             catch (Exception ex)
             {
@@ -287,7 +302,6 @@ Utils.WriteLog($"Comparison files was received from agent {url}", "info");
         public async Task GetScriptLog(string url, string jsonContent)
         {
             Utils.LoadConfig();
-
             try
             {
                 if (Settings.Get("MODE").ToLower() == "debug")
@@ -340,8 +354,14 @@ Utils.WriteLog($"Comparison files was received from agent {url}", "info");
                 Utils.WriteLog("Insert devices to portal.", "info");
                 string pythonScriptsFolder = Settings.Get("PYTHON_SCRIPTS_PATH");
                 string pythonExePath = Settings.Get("PYTHON");
+<<<<<<< HEAD
+                _logger.WriteLog($"Python exe path: {pythonExePath}", "info");
+                int returnCode = Utils.RunCommand(pythonExePath, "insert_devices.py", $"{configFile} {strategy}", pythonScriptsFolder, Settings.Get("OUTPUT"));
+                Utils.WriteToFile(Settings.Get("RETURN_CODE"), returnCode.ToString(), false);
+=======
                 Utils.WriteLog($"Python exe path: {pythonExePath}", "info");
-                Utils.RunCommand(pythonExePath, "insert_devices.py", $"{configFile} {strategy}", pythonScriptsFolder, Settings.Get("OUTPUT"));                
+                Utils.RunCommand(pythonExePath, "insert_devices.py", $"{configFile}", pythonScriptsFolder, Settings.Get("OUTPUT"));
+>>>>>>> b415cfbdad446fb90c27c693aa29268fdc656da8
             }
             catch (Exception ex)
             {
@@ -378,19 +398,19 @@ Utils.WriteLog($"Comparison files was received from agent {url}", "info");
                 var fromDateStr = fromDate.ToString("s", System.Globalization.CultureInfo.InvariantCulture);
                 var toDateStr = toDate.ToString("s", System.Globalization.CultureInfo.InvariantCulture);
 
-                Utils.WriteLog($"Deleting {dataType} from portal.", "info");
+                _logger.WriteLog($"Deleting {dataType} from portal.", "info");
                 if (!string.IsNullOrEmpty(fromDateStr) && !string.IsNullOrEmpty(toDateStr)) 
-                    Utils.WriteLog($"From date {fromDate} to date {toDate}", "info");
+                    _logger.WriteLog($"From date {fromDate} to date {toDate}", "info");
 
                 string pythonScriptsFolder = Settings.Get("PYTHON_SCRIPTS_PATH");
                 string pythonExePath = Settings.Get("PYTHON");
-                Utils.WriteLog($"Python exe path: {pythonExePath}", "info");
+                _logger.WriteLog($"Python exe path: {pythonExePath}", "info");
                 int returnCode = Utils.RunCommand(pythonExePath, "delete_device.py", $"{deviceSerialNumber} {deviceType} {configFile} {dataType} {fromDateStr} {toDateStr}", pythonScriptsFolder, Settings.Get("OUTPUT"));
                 Utils.WriteToFile(Settings.Get("RETURN_CODE"), returnCode.ToString(), false);
             }
             catch (Exception ex)
             {
-                Utils.WriteLog($"Error in DeleteDeviceDataFromPortal: {ex.Message} {ex.StackTrace}", "error");
+                _logger.WriteLog($"Error in DeleteDeviceDataFromPortal: {ex.Message} {ex.StackTrace}", "error");
             }
         }
 
@@ -403,17 +423,17 @@ Utils.WriteLog($"Comparison files was received from agent {url}", "info");
         {
             try
             {
-                Utils.WriteLog($"Deleting device from portal.", "info");
+                _logger.WriteLog($"Deleting device from portal.", "info");
                 
                 string pythonScriptsFolder = Settings.Get("PYTHON_SCRIPTS_PATH");
                 string pythonExePath = Settings.Get("PYTHON");
-                Utils.WriteLog($"Python exe path: {pythonExePath}", "info");
+                _logger.WriteLog($"Python exe path: {pythonExePath}", "info");
                 int returnCode = Utils.RunCommand(pythonExePath, "delete_device.py", $"{deviceSerialNumber} {deviceType} {configFile}", pythonScriptsFolder, Settings.Get("OUTPUT"));
                 Utils.WriteToFile(Settings.Get("RETURN_CODE"), returnCode.ToString(), false);
             }
             catch (Exception ex)
             {
-                Utils.WriteLog($"Error in DeleteDeviceFromPortal: {ex.Message} {ex.StackTrace}", "error");
+                _logger.WriteLog($"Error in DeleteDeviceFromPortal: {ex.Message} {ex.StackTrace}", "error");
             }
         }
 
@@ -473,7 +493,6 @@ Utils.WriteLog($"Comparison files was received from agent {url}", "info");
         public string TestCommand(string num)
         {
             Utils.LoadConfig();
-
 
             try
             {
