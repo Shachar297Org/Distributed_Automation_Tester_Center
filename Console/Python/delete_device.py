@@ -34,8 +34,8 @@ def DeleteDevice(accessToken: str, deviceSerialNumber: str, deviceType: str, con
         return
     print('Login success. ')
 
-    host = '/'.join([config['API_DELETE_DEVICE'], 'types',
-                     deviceType, 'serialNumbers', deviceSerialNumber])
+    host = '/'.join([config['API_DELETE_DEVICE'], 'deviceTypes',
+                     deviceType, 'deviceSerialNumbers', deviceSerialNumber])
     print('host: {}'.format(host))
     response = requests.delete(url=host, headers={'Content-Type': 'application/json', 'Authorization': 'Bearer {}'.format(
         accessToken)})
