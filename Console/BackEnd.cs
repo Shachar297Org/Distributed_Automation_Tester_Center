@@ -14,7 +14,7 @@ namespace Backend
     public class BackEnd : IBackEndInterfaces
     {
         private static System.Timers.Timer _getAgentConnectTimer = new System.Timers.Timer(new TimeSpan(0, 1, 0).TotalMilliseconds);
-        private static System.Timers.Timer _getAgentReadyTimer = new System.Timers.Timer(new TimeSpan(0, 2, 0).TotalMilliseconds);
+        private static System.Timers.Timer _getAgentReadyTimer = new System.Timers.Timer(new TimeSpan(0, 4, 0).TotalMilliseconds);
         private static List<Agent> _agents = new List<Agent>();
         private static List<Device> _devices = null;
         private static object _lock = new object();
