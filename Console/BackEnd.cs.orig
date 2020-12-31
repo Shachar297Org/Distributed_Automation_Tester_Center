@@ -14,7 +14,7 @@ namespace Backend
     public class BackEnd : IBackEndInterfaces
     {
         private static System.Timers.Timer _getAgentConnectTimer = new System.Timers.Timer(new TimeSpan(0, 1, 0).TotalMilliseconds);
-        private static System.Timers.Timer _getAgentReadyTimer = new System.Timers.Timer(new TimeSpan(0, 4, 0).TotalMilliseconds);
+        private static System.Timers.Timer _getAgentReadyTimer = new System.Timers.Timer(new TimeSpan(0, 1, 0).TotalMilliseconds);
         private static List<Agent> _agents = new List<Agent>();
         private static List<Device> _devices = null;
         private static object _lock = new object();
@@ -44,12 +44,17 @@ namespace Backend
             Utils.LoadConfig();
             try
             {
-                Utils.WriteLog($"-----INIT STAGE BEGIN-----", "info");
+                //int connectTimerSec = int.Parse(Settings.Get("CONNECT_TIMER_SEC"));
+                //int readyTimerSec = int.Parse(Settings.Get("READY_TIMER_SEC"));
+               // _getAgentConnectTimer = new System.Timers.Timer(new TimeSpan(0, 0, connectTimerSec).TotalMilliseconds);
+               // _getAgentReadyTimer = new System.Timers.Timer(new TimeSpan(0, 0, readyTimerSec).TotalMilliseconds);
                 _getAgentConnectTimer.Elapsed += GetAgentConnectTimer_Elapsed;
                 _getAgentReadyTimer.Elapsed += GetAgentReadyTimer_Elapsed;
+
                 _getAgentConnectTimer.Start();
                 Utils.WriteLog("Starting connect timer", "info");
 
+<<<<<<< HEAD
                 //InitAgents();
                 InsertDevicesToPortal(Settings.Get("CONFIG_FILE"), InsertionStrategy.union);
 
@@ -59,9 +64,13 @@ namespace Backend
                 //DeleteDeviceDataFromPortal("VOLODYMYR-TEST-5", "GA-0000180", Settings.Get("CONFIG_FILE"), DeviceData.commands, new DateTime(2020, 12, 17, 18, 0, 0), new DateTime(2020, 12, 24, 18, 0, 0));
                 //DeleteDeviceFromPortal("VOLODYMYR-TEST-6", "GA-0000180", Settings.Get("CONFIG_FILE"));
 
+=======
+                //InitAgents(agentsFile);
+                InsertDevicesToPortal(Settings.Get("CONFIG_FILE"));
+>>>>>>> b415cfbdad446fb90c27c693aa29268fdc656da8
                 //InsertDevicesToPortal(Settings.Get("ENV"), Settings.Get("DEVICES_PATH"));
                 //CollectAWSServices(Settings.Get("ENV"));
-                //CollectAWSInstances();                
+                //CollectAWSInstances();
             }
             catch (Exception ex)
             {
@@ -69,8 +78,21 @@ namespace Backend
             }
             finally
             {
-                Utils.WriteLog($"-----INIT STAGE END-----", "info");
+                Utils.WriteLog("finished Init", "info");
             }
+            
+
+            /*
+             * 1. get device list from portal (BIOT API) - done [insert_devices.py]
+             * 2. insert new devices that are not exist in the portal (BIOT API) - done
+             * 3. wait 2 min for agent to connect - done
+             * 4. after 2 min divide device list according to agent number and prepare list of devices per agent - done
+             * 5. send device list to all agents and wait 2 min until agent signal that they finished to create all the devices. [distribute_devices.py] - done
+             *    the agent will signal by using the API  "AgentReady" - done
+             * 6. after waiting 2 minutes itereate agent list and map only the agent that are ready. - done
+             * 7. send only to the ready agents the automation script - done
+             * 8. T.B.D
+             * */
         }
 
         /// <summary>
@@ -111,7 +133,7 @@ namespace Backend
                 Utils.LoadConfig();
                 try
                 {
-                    Utils.WriteLog($"-----CONNECT STAGE BEGIN-----", "info");
+
                     string agentsPath = Settings.Get("AGENTS_PATH");
                     Utils.WriteLog($"Received agent connect from {agentUrl}.", "info");
                     string agentsFilePath = Settings.Get("AGENTS_PATH");
@@ -137,7 +159,7 @@ namespace Backend
                     {
                         if (Settings.Get("MODE").ToLower() == "debug")
                         {
-                            agentUrl = agentUrl.Replace("127.0.0.1", "localhost").Replace("::1", "localhost");
+                            agentUrl = agentUrl.Replace("127.0.0.1", "localhost");
                         }
                         string[] urlStrings = agentUrl.Split(':');
                         Utils.WriteLog($"Adding agent {agentUrl} to pool.", "info");
@@ -147,8 +169,9 @@ namespace Backend
                     }
                     Utils.WriteLog($"Agent {agentUrl}: exiting critical code...", "info");
 
-                    Utils.WriteLog($"Agent {agentUrl} was connected successfully.", "info");
+                    //Utils.WriteLog($"Agent {agentUrl} was connected successfully.", "info");
 
+                    // await Task.Delay(10);
                     return true;
                 }
                 catch (Exception ex)
@@ -158,7 +181,11 @@ namespace Backend
                 }
                 finally
                 {
-                    Utils.WriteLog($"-----CONNECT STAGE END-----", "info");
+<<<<<<< HEAD
+                    agentUrl = agentUrl.Replace("127.0.0.1", "localhost").Replace("::1", "localhost");
+=======
+                    Utils.WriteLog("finished Connect", "info");
+>>>>>>> b415cfbdad446fb90c27c693aa29268fdc656da8
                 }
             }
         }
@@ -176,9 +203,12 @@ namespace Backend
 
                 try
                 {
+<<<<<<< HEAD
+                    url = url.Replace("127.0.0.1", "localhost").Replace("::1", "localhost");
+=======
                     if (Settings.Get("MODE").ToLower() == "debug")
                     {
-                        url = url.Replace("127.0.0.1", "localhost").Replace("::1", "localhost");
+                        url = url.Replace("127.0.0.1", "localhost");
                     }
 
                     Utils.WriteLog($"Received agent ready from {url}.", "info");
@@ -193,22 +223,21 @@ namespace Backend
                     //Utils.WriteAgentListToFile(_agents, agentsFilePath);
 
                     return true;
+>>>>>>> b415cfbdad446fb90c27c693aa29268fdc656da8
                 }
                 catch (Exception ex)
                 {
                     Utils.WriteLog($"Error in agentReady: {ex.Message} {ex.StackTrace}", "error");
                     return false;
-                }                
+                }
             }
         }
 
         public async Task GetComparisonResults(string url, string jsonContent)
         {
-            Utils.LoadConfig();            
+            Utils.LoadConfig();
             try
             {
-                Utils.WriteLog($"-----GET COMPARE RESULTS BEGIN-----", "info");
-
                 if (Settings.Get("MODE").ToLower() == "debug")
                 {
                     url = url.Replace("127.0.0.1", "localhost").Replace("::1", "localhost");
@@ -255,15 +284,12 @@ namespace Backend
                     //Utils.WriteToFile(jsonFileByDevice, jsonContentByDevice, append: false);
                     Utils.WriteRecordsToCsv(csvFileByDevice, deviceResultsDict[deviceName]);
                 }
-Utils.WriteLog($"Comparison files was received from agent {url}", "info");
+
+                Utils.WriteLog($"Comparison files was received from agent {url}", "info");
             }
             catch (Exception ex)
             {
                 Utils.WriteLog($"{ex.Message} {ex.StackTrace}", "error");
-            }
-            finally
-            {
-                Utils.WriteLog($"-----GET COMPARE RESULTS END-----", "info");
             }
         }
 
@@ -276,11 +302,8 @@ Utils.WriteLog($"Comparison files was received from agent {url}", "info");
         public async Task GetScriptLog(string url, string jsonContent)
         {
             Utils.LoadConfig();
-
             try
             {
-                Utils.WriteLog($"-----GET SCRIPT LOG BEGIN-----", "info");
-
                 if (Settings.Get("MODE").ToLower() == "debug")
                 {
                     url = url.Replace("127.0.0.1", "localhost").Replace("::1", "localhost");
@@ -305,10 +328,6 @@ Utils.WriteLog($"Comparison files was received from agent {url}", "info");
             {
                 Utils.WriteLog($"{ex.Message} {ex.StackTrace}", "error");
             }
-            finally
-            {
-                Utils.WriteLog($"-----GET SCRIPT LOG END-----", "info");
-            }
         }
 
         public List<string> GetAgents()
@@ -332,19 +351,21 @@ Utils.WriteLog($"Comparison files was received from agent {url}", "info");
         {
             try
             {
-                Utils.WriteLog("-----INSERT DEVICES BEGIN----.", "info");
+                Utils.WriteLog("Insert devices to portal.", "info");
                 string pythonScriptsFolder = Settings.Get("PYTHON_SCRIPTS_PATH");
                 string pythonExePath = Settings.Get("PYTHON");
+<<<<<<< HEAD
+                _logger.WriteLog($"Python exe path: {pythonExePath}", "info");
+                int returnCode = Utils.RunCommand(pythonExePath, "insert_devices.py", $"{configFile} {strategy}", pythonScriptsFolder, Settings.Get("OUTPUT"));
+                Utils.WriteToFile(Settings.Get("RETURN_CODE"), returnCode.ToString(), false);
+=======
                 Utils.WriteLog($"Python exe path: {pythonExePath}", "info");
-                Utils.RunCommand(pythonExePath, "insert_devices.py", $"{configFile} {strategy}", pythonScriptsFolder, Settings.Get("OUTPUT"));                
+                Utils.RunCommand(pythonExePath, "insert_devices.py", $"{configFile}", pythonScriptsFolder, Settings.Get("OUTPUT"));
+>>>>>>> b415cfbdad446fb90c27c693aa29268fdc656da8
             }
             catch (Exception ex)
             {
                 Utils.WriteLog($"Error in insertDevices: {ex.Message} {ex.StackTrace}", "error");
-            }
-            finally
-            {
-                Utils.WriteLog("-----INSERT DEVICES END----.", "info");
             }
         }
 
@@ -355,17 +376,13 @@ Utils.WriteLog($"Comparison files was received from agent {url}", "info");
         {
             try
             {
-                Utils.WriteLog($"-----DISTRIBUTE STAGE BEGIN-----", "info");
+                Utils.WriteLog($"Distribute device among agents.", "info");
                 int returnCode = Utils.RunCommand(Settings.Get("PYTHON"), "distribute_devices.py", $"{Settings.Get("CONFIG_FILE")}", Settings.Get("PYTHON_SCRIPTS_PATH"), Settings.Get("OUTPUT"));
                 Utils.WriteToFile(Settings.Get("RETURN_CODE"), returnCode.ToString(), false);
             }
             catch (Exception ex)
             {
                 Utils.WriteLog($"Error in distributeDevices: {ex.Message} {ex.StackTrace}", "error");
-            }
-            finally
-            {
-                Utils.WriteLog($"-----DISTRIBUTE STAGE END-----", "info");
             }
         }
 
@@ -381,19 +398,19 @@ Utils.WriteLog($"Comparison files was received from agent {url}", "info");
                 var fromDateStr = fromDate.ToString("s", System.Globalization.CultureInfo.InvariantCulture);
                 var toDateStr = toDate.ToString("s", System.Globalization.CultureInfo.InvariantCulture);
 
-                Utils.WriteLog($"Deleting {dataType} from portal.", "info");
+                _logger.WriteLog($"Deleting {dataType} from portal.", "info");
                 if (!string.IsNullOrEmpty(fromDateStr) && !string.IsNullOrEmpty(toDateStr)) 
-                    Utils.WriteLog($"From date {fromDate} to date {toDate}", "info");
+                    _logger.WriteLog($"From date {fromDate} to date {toDate}", "info");
 
                 string pythonScriptsFolder = Settings.Get("PYTHON_SCRIPTS_PATH");
                 string pythonExePath = Settings.Get("PYTHON");
-                Utils.WriteLog($"Python exe path: {pythonExePath}", "info");
+                _logger.WriteLog($"Python exe path: {pythonExePath}", "info");
                 int returnCode = Utils.RunCommand(pythonExePath, "delete_device.py", $"{deviceSerialNumber} {deviceType} {configFile} {dataType} {fromDateStr} {toDateStr}", pythonScriptsFolder, Settings.Get("OUTPUT"));
                 Utils.WriteToFile(Settings.Get("RETURN_CODE"), returnCode.ToString(), false);
             }
             catch (Exception ex)
             {
-                Utils.WriteLog($"Error in DeleteDeviceDataFromPortal: {ex.Message} {ex.StackTrace}", "error");
+                _logger.WriteLog($"Error in DeleteDeviceDataFromPortal: {ex.Message} {ex.StackTrace}", "error");
             }
         }
 
@@ -406,17 +423,17 @@ Utils.WriteLog($"Comparison files was received from agent {url}", "info");
         {
             try
             {
-                Utils.WriteLog($"Deleting device from portal.", "info");
+                _logger.WriteLog($"Deleting device from portal.", "info");
                 
                 string pythonScriptsFolder = Settings.Get("PYTHON_SCRIPTS_PATH");
                 string pythonExePath = Settings.Get("PYTHON");
-                Utils.WriteLog($"Python exe path: {pythonExePath}", "info");
+                _logger.WriteLog($"Python exe path: {pythonExePath}", "info");
                 int returnCode = Utils.RunCommand(pythonExePath, "delete_device.py", $"{deviceSerialNumber} {deviceType} {configFile}", pythonScriptsFolder, Settings.Get("OUTPUT"));
                 Utils.WriteToFile(Settings.Get("RETURN_CODE"), returnCode.ToString(), false);
             }
             catch (Exception ex)
             {
-                Utils.WriteLog($"Error in DeleteDeviceFromPortal: {ex.Message} {ex.StackTrace}", "error");
+                _logger.WriteLog($"Error in DeleteDeviceFromPortal: {ex.Message} {ex.StackTrace}", "error");
             }
         }
 
@@ -428,7 +445,6 @@ Utils.WriteLog($"Comparison files was received from agent {url}", "info");
         {
             try
             {
-                Utils.WriteLog("-----SEND SCRIPT STAGE BEGIN-----", "info");
                 Utils.WriteLog("Send automation script to agents.", "info");
                 int returnCode = Utils.RunCommand(Settings.Get("PYTHON"), "send_script.py", $"{Settings.Get("CONFIG_FILE")}", Settings.Get("PYTHON_SCRIPTS_PATH"), Settings.Get("OUTPUT"));
                 Utils.WriteToFile(Settings.Get("RETURN_CODE"), returnCode.ToString(), false);
@@ -436,10 +452,6 @@ Utils.WriteLog($"Comparison files was received from agent {url}", "info");
             catch (Exception ex)
             {
                 Utils.WriteLog($"Error in sendAutomationScript: {ex.Message} {ex.StackTrace}", "error");
-            }
-            finally
-            {
-                Utils.WriteLog("-----SEND SCRIPT STAGE END-----", "info");
             }
         }
 
@@ -464,9 +476,6 @@ Utils.WriteLog($"Comparison files was received from agent {url}", "info");
             Utils.WriteToFile(Settings.Get("RETURN_CODE"), returnCode.ToString(), false);
         }
 
-        /// <summary>
-        /// Resets backend
-        /// </summary>
         public void Reset()
         {
             Utils.LoadConfig();
@@ -484,7 +493,6 @@ Utils.WriteLog($"Comparison files was received from agent {url}", "info");
         public string TestCommand(string num)
         {
             Utils.LoadConfig();
-
 
             try
             {

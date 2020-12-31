@@ -1,5 +1,6 @@
 import sys
 from utils import *
+import requests
 
 
 def SendRequestLogin(config: object):
@@ -20,25 +21,61 @@ def SendRequestLogin(config: object):
     return jsonObj['accessToken']
 
 
-def DeleteDevice(deviceSerialNumber: str, deviceType: str, config: object):
-    deviceName = '_'.join([deviceSerialNumber, deviceSerialNumber])
-    accessToken = SendRequestLogin(config)
+def DeleteDevices(accessToken: str, devicesList, config: object):
+    for device in devicesList:
+        DeleteDevice(accessToken, device['deviceSerialNumber'], device['deviceType'], config)
+
+
+def DeleteDevice(accessToken: str, deviceSerialNumber: str, deviceType: str, config: object):
+    deviceName = '_'.join([deviceSerialNumber, deviceType])
+    #accessToken = SendRequestLogin(config)
     if not accessToken:
         print('Error: Login failed.')
         return
-    print('Login success.')
+    print('Login success. ')
 
-    host = '/'.join([config['API_DELETE_DEVICE'], 'types',
-                     deviceType, 'serialNumbers', deviceSerialNumber])
+    host = '/'.join([config['API_DELETE_DEVICE'], 'deviceTypes',
+                     deviceType, 'deviceSerialNumbers', deviceSerialNumber])
     print('host: {}'.format(host))
     response = requests.delete(url=host, headers={'Content-Type': 'application/json', 'Authorization': 'Bearer {}'.format(
         accessToken)})
     if response.ok:
-        print('Device device {} was deleted successfully.'.format(deviceName))
+        print('Device {} was deleted successfully.'.format(deviceName))
+
     else:
         print('Error: cannot delete device {}. status code: {}. {}'.format(
             deviceName, response.status_code, response.text))
+    
 
+def DeleteDeviceData(accessToken: str, deviceSerialNumber: str, deviceType: str, config: object, dataType: str, fromDate: str, toDate: str):
+    deviceName = '_'.join([deviceSerialNumber, deviceType])
+    #accessToken = SendRequestLogin(config)
+    
+    if not accessToken:
+        print('Error: Login failed.')
+        return
+    print('Login success. ')
+
+    host = '/'.join([config['API_PROCESSING_URL'], dataType, 'types',
+                     deviceType, 'serialNumbers', deviceSerialNumber])
+    
+    params = ''
+    if fromDate and toDate:
+        params = '?from={}&to={}'.format(fromDate, toDate)
+
+    host = host + params
+    print('host: {}'.format(host))
+
+    response = requests.delete(url=host, headers={'Content-Type': 'application/json', 'Authorization': 'Bearer {}'.format(
+        accessToken)})
+
+    if response.ok:
+        print('{} from {} were deleted successfully.'.format(dataType, deviceName))
+    else:
+        print('Error: cannot delete {} from {}. status code: {}. {}'.format(dataType,
+            deviceName, response.status_code, response.text))
+
+    
 
 if __name__ == "__main__":
     from activate_env import *
@@ -48,10 +85,40 @@ if __name__ == "__main__":
     import requests
     from utils import *
 
-    configFile = sys.argv[1]
-    deviceSerialNumber = sys.argv[2]
-    deviceType = sys.argv[3]
+    print('-----delete_device-----')
+    print('Arguments: {}'.format(sys.argv))
 
-    config = LoadConfigText(configFile)
+    try:
+        
+        if len(sys.argv) < 4:
+            print('Enter arguments: deviceSerialNumber, deviceType and configFile to delete the device')
+            print('Enter arguments: deviceSerialNumber, deviceType, configFile, dataType(events or commands), fromDate and toDate to delete device events or commands')
+            exit(1)
 
-    DeleteDevice(deviceSerialNumber, deviceType, config)
+        deviceSerialNumber = sys.argv[1]
+        deviceType = sys.argv[2]
+        configFile = sys.argv[3]
+
+        if not os.path.exists(configFile):
+            print('Config file {} not exist'.format(configFile))
+            exit(2)
+
+        config = LoadConfigText(configFile)
+        accessToken = SendRequestLogin(config)
+
+        if len(sys.argv) == 7:
+            dataType = sys.argv[4]
+            fromDate = sys.argv[5]
+            toDate = sys.argv[6]
+        
+            DeleteDeviceData(accessToken, deviceSerialNumber, deviceType, config, dataType, fromDate, toDate)
+        else:
+            DeleteDevice(accessToken, deviceSerialNumber, deviceType, config)
+
+        print('-----success-----')
+    except Exception as ex:
+        print('Error: {}'.format(ex))
+        print('-----fail-----')
+        exit(1)
+
+
