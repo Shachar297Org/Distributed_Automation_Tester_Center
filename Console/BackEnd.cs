@@ -63,8 +63,8 @@ namespace Backend
                 //DeleteDeviceFromPortal("VOLODYMYR-TEST-6", "GA-0000180", Settings.Get("CONFIG_FILE"));
 
                 //InsertDevicesToPortal(Settings.Get("ENV"), Settings.Get("DEVICES_PATH"));
-                //CollectAWSServices(Settings.Get("ENV"));
-                //CollectAWSInstances();                
+                CollectAWSServices(Settings.Get("ENV"));
+                CollectAWSInstances();                
             }
             catch (Exception ex)
             {
@@ -270,7 +270,7 @@ namespace Backend
                     //Utils.WriteToFile(jsonFileByDevice, jsonContentByDevice, append: false);
                     Utils.WriteRecordsToCsv(csvFileByDevice, deviceResultsDict[deviceName]);
                 }
-Utils.WriteLog($"Comparison files was received from agent {url}", "info");
+                Utils.WriteLog($"Comparison files was received from agent {url}", "info");
             }
             catch (Exception ex)
             {
@@ -469,6 +469,8 @@ Utils.WriteLog($"Comparison files was received from agent {url}", "info");
             File.Delete(returncodePath);
             File.Delete(logfilePath);
         }
+
+
 
         public string TestCommand(string num)
         {
