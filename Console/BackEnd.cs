@@ -14,7 +14,7 @@ namespace Backend
     public class BackEnd : IBackEndInterfaces
     {
         private static System.Timers.Timer _getAgentConnectTimer = new System.Timers.Timer(new TimeSpan(0, 1, 0).TotalMilliseconds);
-        private static System.Timers.Timer _getAgentReadyTimer = new System.Timers.Timer(new TimeSpan(0, 1, 0).TotalMilliseconds);
+        private static System.Timers.Timer _getAgentReadyTimer = new System.Timers.Timer(new TimeSpan(0, 4, 0).TotalMilliseconds);
         private static List<Agent> _agents = new List<Agent>();
         private static List<Device> _devices = null;
         private static object _lock = new object();
@@ -44,10 +44,7 @@ namespace Backend
             Utils.LoadConfig();
             try
             {
-                //int connectTimerSec = int.Parse(Settings.Get("CONNECT_TIMER_SEC"));
-                //int readyTimerSec = int.Parse(Settings.Get("READY_TIMER_SEC"));
-               // _getAgentConnectTimer = new System.Timers.Timer(new TimeSpan(0, 0, connectTimerSec).TotalMilliseconds);
-               // _getAgentReadyTimer = new System.Timers.Timer(new TimeSpan(0, 0, readyTimerSec).TotalMilliseconds);
+                Utils.WriteLog($"-----INIT STAGE BEGIN-----", "info");
                 _getAgentConnectTimer.Elapsed += GetAgentConnectTimer_Elapsed;
                 _getAgentReadyTimer.Elapsed += GetAgentReadyTimer_Elapsed;
                 _getAgentConnectTimer.Start();
@@ -72,21 +69,8 @@ namespace Backend
             }
             finally
             {
-                Utils.WriteLog("finished Init", "info");
+                Utils.WriteLog($"-----INIT STAGE END-----", "info");
             }
-            
-
-            /*
-             * 1. get device list from portal (BIOT API) - done [insert_devices.py]
-             * 2. insert new devices that are not exist in the portal (BIOT API) - done
-             * 3. wait 2 min for agent to connect - done
-             * 4. after 2 min divide device list according to agent number and prepare list of devices per agent - done
-             * 5. send device list to all agents and wait 2 min until agent signal that they finished to create all the devices. [distribute_devices.py] - done
-             *    the agent will signal by using the API  "AgentReady" - done
-             * 6. after waiting 2 minutes itereate agent list and map only the agent that are ready. - done
-             * 7. send only to the ready agents the automation script - done
-             * 8. T.B.D
-             * */
         }
 
         /// <summary>
@@ -127,7 +111,7 @@ namespace Backend
                 Utils.LoadConfig();
                 try
                 {
-
+                    Utils.WriteLog($"-----CONNECT STAGE BEGIN-----", "info");
                     string agentsPath = Settings.Get("AGENTS_PATH");
                     Utils.WriteLog($"Received agent connect from {agentUrl}.", "info");
                     string agentsFilePath = Settings.Get("AGENTS_PATH");
@@ -163,9 +147,8 @@ namespace Backend
                     }
                     Utils.WriteLog($"Agent {agentUrl}: exiting critical code...", "info");
 
-                    //Utils.WriteLog($"Agent {agentUrl} was connected successfully.", "info");
+                    Utils.WriteLog($"Agent {agentUrl} was connected successfully.", "info");
 
-                    // await Task.Delay(10);
                     return true;
                 }
                 catch (Exception ex)
@@ -175,7 +158,7 @@ namespace Backend
                 }
                 finally
                 {
-                    Utils.WriteLog("finished Connect", "info");
+                    Utils.WriteLog($"-----CONNECT STAGE END-----", "info");
                 }
             }
         }
@@ -224,6 +207,8 @@ namespace Backend
             Utils.LoadConfig();            
             try
             {
+                Utils.WriteLog($"-----GET COMPARE RESULTS BEGIN-----", "info");
+
                 if (Settings.Get("MODE").ToLower() == "debug")
                 {
                     url = url.Replace("127.0.0.1", "localhost").Replace("::1", "localhost");
@@ -276,6 +261,10 @@ namespace Backend
             {
                 Utils.WriteLog($"{ex.Message} {ex.StackTrace}", "error");
             }
+            finally
+            {
+                Utils.WriteLog($"-----GET COMPARE RESULTS END-----", "info");
+            }
         }
 
         /// <summary>
@@ -290,6 +279,8 @@ namespace Backend
 
             try
             {
+                Utils.WriteLog($"-----GET SCRIPT LOG BEGIN-----", "info");
+
                 if (Settings.Get("MODE").ToLower() == "debug")
                 {
                     url = url.Replace("127.0.0.1", "localhost").Replace("::1", "localhost");
@@ -314,6 +305,10 @@ namespace Backend
             {
                 Utils.WriteLog($"{ex.Message} {ex.StackTrace}", "error");
             }
+            finally
+            {
+                Utils.WriteLog($"-----GET SCRIPT LOG END-----", "info");
+            }
         }
 
         public List<string> GetAgents()
@@ -337,7 +332,7 @@ namespace Backend
         {
             try
             {
-                Utils.WriteLog("Insert devices to portal.", "info");
+                Utils.WriteLog("-----INSERT DEVICES BEGIN----.", "info");
                 string pythonScriptsFolder = Settings.Get("PYTHON_SCRIPTS_PATH");
                 string pythonExePath = Settings.Get("PYTHON");
                 Utils.WriteLog($"Python exe path: {pythonExePath}", "info");
@@ -346,6 +341,10 @@ namespace Backend
             catch (Exception ex)
             {
                 Utils.WriteLog($"Error in insertDevices: {ex.Message} {ex.StackTrace}", "error");
+            }
+            finally
+            {
+                Utils.WriteLog("-----INSERT DEVICES END----.", "info");
             }
         }
 
@@ -356,13 +355,17 @@ namespace Backend
         {
             try
             {
-                Utils.WriteLog($"Distribute device among agents.", "info");
+                Utils.WriteLog($"-----DISTRIBUTE STAGE BEGIN-----", "info");
                 int returnCode = Utils.RunCommand(Settings.Get("PYTHON"), "distribute_devices.py", $"{Settings.Get("CONFIG_FILE")}", Settings.Get("PYTHON_SCRIPTS_PATH"), Settings.Get("OUTPUT"));
                 Utils.WriteToFile(Settings.Get("RETURN_CODE"), returnCode.ToString(), false);
             }
             catch (Exception ex)
             {
                 Utils.WriteLog($"Error in distributeDevices: {ex.Message} {ex.StackTrace}", "error");
+            }
+            finally
+            {
+                Utils.WriteLog($"-----DISTRIBUTE STAGE END-----", "info");
             }
         }
 
@@ -425,6 +428,7 @@ namespace Backend
         {
             try
             {
+                Utils.WriteLog("-----SEND SCRIPT STAGE BEGIN-----", "info");
                 Utils.WriteLog("Send automation script to agents.", "info");
                 int returnCode = Utils.RunCommand(Settings.Get("PYTHON"), "send_script.py", $"{Settings.Get("CONFIG_FILE")}", Settings.Get("PYTHON_SCRIPTS_PATH"), Settings.Get("OUTPUT"));
                 Utils.WriteToFile(Settings.Get("RETURN_CODE"), returnCode.ToString(), false);
@@ -432,6 +436,10 @@ namespace Backend
             catch (Exception ex)
             {
                 Utils.WriteLog($"Error in sendAutomationScript: {ex.Message} {ex.StackTrace}", "error");
+            }
+            finally
+            {
+                Utils.WriteLog("-----SEND SCRIPT STAGE END-----", "info");
             }
         }
 
@@ -456,6 +464,9 @@ namespace Backend
             Utils.WriteToFile(Settings.Get("RETURN_CODE"), returnCode.ToString(), false);
         }
 
+        /// <summary>
+        /// Resets backend
+        /// </summary>
         public void Reset()
         {
             Utils.LoadConfig();
