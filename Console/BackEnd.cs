@@ -10,6 +10,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Amazon.CloudWatch;
 using Amazon.CloudWatch.Model;
+using System.Timers;
 
 namespace Backend
 {
@@ -17,6 +18,8 @@ namespace Backend
     {
         private static System.Timers.Timer _getAgentConnectTimer = new System.Timers.Timer(new TimeSpan(0, 1, 0).TotalMilliseconds);
         private static System.Timers.Timer _getAgentReadyTimer = new System.Timers.Timer(new TimeSpan(0, 4, 0).TotalMilliseconds);
+        private static System.Timers.Timer _getAWSResourcesTimer = new System.Timers.Timer(new TimeSpan(0, 1, 0).TotalMilliseconds);
+
         private static List<Agent> _agents = new List<Agent>();
         private static List<Device> _devices = null;
         private static Dictionary<string, double> _cpuUtilization = new Dictionary<string, double>();
@@ -51,6 +54,8 @@ namespace Backend
                 Utils.WriteLog($"-----INIT STAGE BEGIN-----", "info");
                 _getAgentConnectTimer.Elapsed += GetAgentConnectTimer_Elapsed;
                 _getAgentReadyTimer.Elapsed += GetAgentReadyTimer_Elapsed;
+                _getAWSResourcesTimer.Elapsed += GetAWSResourcesTimer_Elapsed;
+
                 _getAgentConnectTimer.Start();
                 Utils.WriteLog("Starting connect timer", "info");
 
@@ -80,6 +85,11 @@ namespace Backend
             }
         }
 
+        private void GetAWSResourcesTimer_Elapsed(object sender, ElapsedEventArgs e)
+        {
+            GetAWSMetrics();
+        }
+
         /// <summary>
         /// Distribute devices among devices and wait for agents to be ready
         /// </summary>
@@ -105,8 +115,8 @@ namespace Backend
             Utils.WriteAgentListToFile(_agents, Settings.Get("AGENTS_PATH"));
             SendAutomationScript();
 
-            // Measure cpuUtilization
-            GetAWSMetrics();
+            Utils.WriteLog($"Starting AWS resources timer", "info");
+            _getAWSResourcesTimer.Start();
         }
 
         /// <summary>
@@ -214,6 +224,10 @@ namespace Backend
 
         public async Task GetComparisonResults(string url, string jsonContent)
         {
+            // stop aws resource meaurement
+            Utils.WriteLog($"Stopping AWS resources timer", "info");
+            _getAWSResourcesTimer.Stop();
+
             Utils.LoadConfig();            
             try
             {
