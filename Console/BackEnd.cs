@@ -8,6 +8,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using Amazon.CloudWatch;
+using Amazon.CloudWatch.Model;
 
 namespace Backend
 {
@@ -17,6 +19,8 @@ namespace Backend
         private static System.Timers.Timer _getAgentReadyTimer = new System.Timers.Timer(new TimeSpan(0, 4, 0).TotalMilliseconds);
         private static List<Agent> _agents = new List<Agent>();
         private static List<Device> _devices = null;
+        private static Dictionary<string, double> _cpuUtilization = new Dictionary<string, double>();
+
         private static object _lock = new object();
 
         enum DeviceData
@@ -53,6 +57,9 @@ namespace Backend
                 //InitAgents();
                 InsertDevicesToPortal(Settings.Get("CONFIG_FILE"), InsertionStrategy.union);
 
+                // Measure cpuUtilization
+                GetAWSMetrics();
+
                 //DeleteDeviceDataFromPortal("999", "GA-0005200", Settings.Get("CONFIG_FILE"), DeviceData.events, new DateTime(2020, 7, 1, 8, 8, 50), new DateTime(2020, 7, 29, 8, 9, 0));
                 //DeleteDeviceDataFromPortal("999", "GA-0005200", Settings.Get("CONFIG_FILE"), DeviceData.commands, new DateTime(2020, 7, 1, 8, 8, 50), new DateTime(2020, 9, 29, 8, 9, 0));
                 //DeleteDeviceDataFromPortal("VOLODYMYR-TEST-5", "GA-0000180", Settings.Get("CONFIG_FILE"), DeviceData.events, new DateTime(2020, 12, 17, 18, 0, 0), new DateTime(2020, 12, 24, 18, 0, 0));
@@ -60,8 +67,8 @@ namespace Backend
                 //DeleteDeviceFromPortal("VOLODYMYR-TEST-6", "GA-0000180", Settings.Get("CONFIG_FILE"));
 
                 //InsertDevicesToPortal(Settings.Get("ENV"), Settings.Get("DEVICES_PATH"));
-                CollectAWSServices(Settings.Get("ENV"));
-                CollectAWSInstances();                
+                //CollectAWSServices(Settings.Get("ENV"));
+                //CollectAWSInstances();                
             }
             catch (Exception ex)
             {
@@ -97,6 +104,9 @@ namespace Backend
             _getAgentReadyTimer.Stop();
             Utils.WriteAgentListToFile(_agents, Settings.Get("AGENTS_PATH"));
             SendAutomationScript();
+
+            // Measure cpuUtilization
+            GetAWSMetrics();
         }
 
         /// <summary>
@@ -464,6 +474,68 @@ namespace Backend
             Utils.WriteToFile(Settings.Get("RETURN_CODE"), returnCode.ToString(), false);
         }
 
+        private void GetAWSMetrics()
+        {
+            try
+            {
+                var instanceIds = Settings.Get("AWS_EC2_INSTANCES").Split(',');
+
+                var client = new AmazonCloudWatchClient(
+                     Settings.Get("AWSAccessKey"),
+                     Settings.Get("AWSSecretKey")
+                     );
+
+
+                foreach (var instanceId in instanceIds)
+                {
+                    var request = new GetMetricStatisticsRequest();
+                    request.MetricName = "CPUUtilization";
+                    request.Period = 60;
+                    request.Statistics.Add("Maximum");
+                    request.Namespace = "AWS/EC2";
+                    request.Unit = "Percent";
+
+                    var dimension = new Dimension
+                    {
+                        Name = "InstanceId",
+                        Value = instanceId,
+                    };
+
+                    request.Dimensions.Add(dimension);
+
+                    var currentTime = DateTime.UtcNow;
+                    var startTime = currentTime.AddMinutes(-20);
+                    string currentTimeString = currentTime.ToString("yyyy-MM-ddTHH:mm:ssZ");
+                    string startTimeString = startTime.ToString("yyyy-MM-ddTHH:mm:ssZ");
+
+                    request.StartTimeUtc = Convert.ToDateTime(startTimeString);
+                    request.EndTimeUtc = Convert.ToDateTime(currentTimeString);
+
+                    var response = client.GetMetricStatisticsAsync(request).Result;
+
+                    if (response.Datapoints.Count > 0)
+                    {
+                        var dataPoint = response.Datapoints[0];
+                        if (_cpuUtilization.ContainsKey(dimension.Value))
+                        {
+                            if (_cpuUtilization[dimension.Value] < dataPoint.Maximum)
+                            {
+                                Utils.WriteLog($"Instance: {dimension.Value} CPU Max load increased from: {_cpuUtilization[dimension.Value]} to {dataPoint.Maximum}", "info");
+                                _cpuUtilization[dimension.Value] = dataPoint.Maximum;
+                            }
+                        }
+                        else _cpuUtilization[dimension.Value] = dataPoint.Maximum;
+
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Utils.WriteLog($"Error in GetAWSMetrics: {ex.Message} {ex.StackTrace}", "error");
+            }
+
+        }
+ 
         /// <summary>
         /// Resets backend
         /// </summary>
