@@ -65,12 +65,6 @@ namespace Backend
                 // Measure cpuUtilization
                 GetAWSMetrics();
 
-                //DeleteDeviceDataFromPortal("999", "GA-0005200", Settings.Get("CONFIG_FILE"), DeviceData.events, new DateTime(2020, 7, 1, 8, 8, 50), new DateTime(2020, 7, 29, 8, 9, 0));
-                //DeleteDeviceDataFromPortal("999", "GA-0005200", Settings.Get("CONFIG_FILE"), DeviceData.commands, new DateTime(2020, 7, 1, 8, 8, 50), new DateTime(2020, 9, 29, 8, 9, 0));
-                //DeleteDeviceDataFromPortal("VOLODYMYR-TEST-5", "GA-0000180", Settings.Get("CONFIG_FILE"), DeviceData.events, new DateTime(2020, 12, 17, 18, 0, 0), new DateTime(2020, 12, 24, 18, 0, 0));
-                //DeleteDeviceDataFromPortal("VOLODYMYR-TEST-5", "GA-0000180", Settings.Get("CONFIG_FILE"), DeviceData.commands, new DateTime(2020, 12, 17, 18, 0, 0), new DateTime(2020, 12, 24, 18, 0, 0));
-                //DeleteDeviceFromPortal("VOLODYMYR-TEST-6", "GA-0000180", Settings.Get("CONFIG_FILE"));
-
                 //InsertDevicesToPortal(Settings.Get("ENV"), Settings.Get("DEVICES_PATH"));
                 //CollectAWSServices(Settings.Get("ENV"));
                 //CollectAWSInstances();                
