@@ -16,8 +16,8 @@ namespace Backend
 {
     public class BackEnd : IBackEndInterfaces
     {
-        private static System.Timers.Timer _getAgentConnectTimer = new System.Timers.Timer(new TimeSpan(0, 1, 0).TotalMilliseconds);
-        private static System.Timers.Timer _getAgentReadyTimer = new System.Timers.Timer(new TimeSpan(0, 4, 0).TotalMilliseconds);
+        private static System.Timers.Timer _getAgentConnectTimer = new System.Timers.Timer(new TimeSpan(0, 10, 0).TotalMilliseconds);
+        private static System.Timers.Timer _getAgentReadyTimer = new System.Timers.Timer(new TimeSpan(0, 10, 0).TotalMilliseconds);
         private static System.Timers.Timer _getAWSResourcesTimer = new System.Timers.Timer(new TimeSpan(0, 1, 0).TotalMilliseconds);
 
         private static List<Agent> _agents = new List<Agent>();
@@ -57,10 +57,22 @@ namespace Backend
                 _getAWSResourcesTimer.Elapsed += GetAWSResourcesTimer_Elapsed;
 
                 _getAgentConnectTimer.Start();
-                Utils.WriteLog("Starting connect timer", "info");
+                Utils.WriteLog("*****Connect timer start*****", "info");
 
-                //InitAgents();
-                InsertDevicesToPortal(Settings.Get("CONFIG_FILE"), InsertionStrategy.union);
+                
+                Task t = Task.Factory.StartNew(() =>
+                {
+                    InsertDevicesToPortal(Settings.Get("CONFIG_FILE"), InsertionStrategy.union);
+                });
+                if(t.Wait(new TimeSpan(0, 5, 0)))
+                {
+                    Utils.WriteLog("---Inserting devices finished within 5 min", "info");
+                }
+                else
+                {
+                    Utils.WriteLog("---Inserting devices didn't finished within 5 min", "info");
+                }           
+               
 
                 // Measure cpuUtilization
                 GetAWSMetrics();
@@ -92,10 +104,11 @@ namespace Backend
         private void GetAgentConnectTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
         {  
             _getAgentConnectTimer.Stop();
+            Utils.WriteLog($"*****Connect timer stop*****", "info");
             Utils.WriteAgentListToFile(_agents, Settings.Get("AGENTS_PATH"));
-            DistributeDevicesAmongAgents();
-            Utils.WriteLog($"Starting agent ready timer", "info");
             _getAgentReadyTimer.Start();
+            Utils.WriteLog($"*****Ready timer start*****", "info");
+            DistributeDevicesAmongAgents();
         }
 
         /// <summary>
@@ -106,6 +119,7 @@ namespace Backend
         private void GetAgentReadyTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
         {
             _getAgentReadyTimer.Stop();
+            Utils.WriteLog($"*****Ready timer stop*****", "info");
             Utils.WriteAgentListToFile(_agents, Settings.Get("AGENTS_PATH"));
             SendAutomationScript();
 
@@ -186,7 +200,7 @@ namespace Backend
             lock (_lock)
             {
                 Utils.LoadConfig();
-                string agentsFilePath = Settings.Get("AGENTS_PATH");
+                string agentsFilePath = Settings.Get("AGENTS_PATH"); 
 
                 try
                 {
@@ -350,6 +364,7 @@ namespace Backend
         {
             try
             {
+
                 Utils.WriteLog("-----INSERT DEVICES BEGIN----.", "info");
                 string pythonScriptsFolder = Settings.Get("PYTHON_SCRIPTS_PATH");
                 string pythonExePath = Settings.Get("PYTHON");
