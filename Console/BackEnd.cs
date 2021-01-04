@@ -13,8 +13,8 @@ namespace Backend
 {
     public class BackEnd : IBackEndInterfaces
     {
-        private static System.Timers.Timer _getAgentConnectTimer = new System.Timers.Timer(new TimeSpan(0, 1, 0).TotalMilliseconds);
-        private static System.Timers.Timer _getAgentReadyTimer = new System.Timers.Timer(new TimeSpan(0, 4, 0).TotalMilliseconds);
+        private static System.Timers.Timer _getAgentConnectTimer = new System.Timers.Timer(new TimeSpan(0, 10, 0).TotalMilliseconds);
+        private static System.Timers.Timer _getAgentReadyTimer = new System.Timers.Timer(new TimeSpan(0, 10, 0).TotalMilliseconds);
         private static List<Agent> _agents = new List<Agent>();
         private static List<Device> _devices = null;
         private static object _lock = new object();
@@ -48,10 +48,22 @@ namespace Backend
                 _getAgentConnectTimer.Elapsed += GetAgentConnectTimer_Elapsed;
                 _getAgentReadyTimer.Elapsed += GetAgentReadyTimer_Elapsed;
                 _getAgentConnectTimer.Start();
-                Utils.WriteLog("Starting connect timer", "info");
+                Utils.WriteLog("*****Connect timer start*****", "info");
 
-                //InitAgents();
-                InsertDevicesToPortal(Settings.Get("CONFIG_FILE"), InsertionStrategy.union);
+                
+                Task t = Task.Factory.StartNew(() =>
+                {
+                    InsertDevicesToPortal(Settings.Get("CONFIG_FILE"), InsertionStrategy.union);
+                });
+                if(t.Wait(new TimeSpan(0, 5, 0)))
+                {
+                    Utils.WriteLog("---Inserting devices finished within 5 min", "info");
+                }
+                else
+                {
+                    Utils.WriteLog("---Inserting devices didn't finished within 5 min", "info");
+                }           
+               
 
                 //DeleteDeviceDataFromPortal("999", "GA-0005200", Settings.Get("CONFIG_FILE"), DeviceData.events, new DateTime(2020, 7, 1, 8, 8, 50), new DateTime(2020, 7, 29, 8, 9, 0));
                 //DeleteDeviceDataFromPortal("999", "GA-0005200", Settings.Get("CONFIG_FILE"), DeviceData.commands, new DateTime(2020, 7, 1, 8, 8, 50), new DateTime(2020, 9, 29, 8, 9, 0));
@@ -81,10 +93,11 @@ namespace Backend
         private void GetAgentConnectTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
         {  
             _getAgentConnectTimer.Stop();
+            Utils.WriteLog($"*****Connect timer stop*****", "info");
             Utils.WriteAgentListToFile(_agents, Settings.Get("AGENTS_PATH"));
-            DistributeDevicesAmongAgents();
-            Utils.WriteLog($"Starting agent ready timer", "info");
             _getAgentReadyTimer.Start();
+            Utils.WriteLog($"*****Ready timer start*****", "info");
+            DistributeDevicesAmongAgents();
         }
 
         /// <summary>
@@ -95,6 +108,7 @@ namespace Backend
         private void GetAgentReadyTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
         {
             _getAgentReadyTimer.Stop();
+            Utils.WriteLog($"*****Ready timer stop*****", "info");
             Utils.WriteAgentListToFile(_agents, Settings.Get("AGENTS_PATH"));
             SendAutomationScript();
         }
@@ -172,7 +186,7 @@ namespace Backend
             lock (_lock)
             {
                 Utils.LoadConfig();
-                string agentsFilePath = Settings.Get("AGENTS_PATH");
+                string agentsFilePath = Settings.Get("AGENTS_PATH"); 
 
                 try
                 {
@@ -204,7 +218,8 @@ namespace Backend
 
         public async Task GetComparisonResults(string url, string jsonContent)
         {
-            Utils.LoadConfig();            
+            Utils.LoadConfig();
+
             try
             {
                 Utils.WriteLog($"-----GET COMPARE RESULTS BEGIN-----", "info");
@@ -332,6 +347,7 @@ Utils.WriteLog($"Comparison files was received from agent {url}", "info");
         {
             try
             {
+
                 Utils.WriteLog("-----INSERT DEVICES BEGIN----.", "info");
                 string pythonScriptsFolder = Settings.Get("PYTHON_SCRIPTS_PATH");
                 string pythonExePath = Settings.Get("PYTHON");
