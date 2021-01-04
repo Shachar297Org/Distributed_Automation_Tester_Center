@@ -8,6 +8,9 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using Amazon.CloudWatch;
+using Amazon.CloudWatch.Model;
+using System.Timers;
 
 namespace Backend
 {
@@ -15,8 +18,12 @@ namespace Backend
     {
         private static System.Timers.Timer _getAgentConnectTimer = new System.Timers.Timer(new TimeSpan(0, 10, 0).TotalMilliseconds);
         private static System.Timers.Timer _getAgentReadyTimer = new System.Timers.Timer(new TimeSpan(0, 10, 0).TotalMilliseconds);
+        private static System.Timers.Timer _getAWSResourcesTimer = new System.Timers.Timer(new TimeSpan(0, 1, 0).TotalMilliseconds);
+
         private static List<Agent> _agents = new List<Agent>();
         private static List<Device> _devices = null;
+        private static Dictionary<string, double> _cpuUtilization = new Dictionary<string, double>();
+
         private static object _lock = new object();
 
         enum DeviceData
@@ -47,6 +54,8 @@ namespace Backend
                 Utils.WriteLog($"-----INIT STAGE BEGIN-----", "info");
                 _getAgentConnectTimer.Elapsed += GetAgentConnectTimer_Elapsed;
                 _getAgentReadyTimer.Elapsed += GetAgentReadyTimer_Elapsed;
+                _getAWSResourcesTimer.Elapsed += GetAWSResourcesTimer_Elapsed;
+
                 _getAgentConnectTimer.Start();
                 Utils.WriteLog("*****Connect timer start*****", "info");
 
@@ -64,6 +73,9 @@ namespace Backend
                     Utils.WriteLog("---Inserting devices didn't finished within 5 min", "info");
                 }           
                
+
+                // Measure cpuUtilization
+                GetAWSMetrics();
 
                 //DeleteDeviceDataFromPortal("999", "GA-0005200", Settings.Get("CONFIG_FILE"), DeviceData.events, new DateTime(2020, 7, 1, 8, 8, 50), new DateTime(2020, 7, 29, 8, 9, 0));
                 //DeleteDeviceDataFromPortal("999", "GA-0005200", Settings.Get("CONFIG_FILE"), DeviceData.commands, new DateTime(2020, 7, 1, 8, 8, 50), new DateTime(2020, 9, 29, 8, 9, 0));
@@ -83,6 +95,11 @@ namespace Backend
             {
                 Utils.WriteLog($"-----INIT STAGE END-----", "info");
             }
+        }
+
+        private void GetAWSResourcesTimer_Elapsed(object sender, ElapsedEventArgs e)
+        {
+            GetAWSMetrics();
         }
 
         /// <summary>
@@ -111,6 +128,9 @@ namespace Backend
             Utils.WriteLog($"*****Ready timer stop*****", "info");
             Utils.WriteAgentListToFile(_agents, Settings.Get("AGENTS_PATH"));
             SendAutomationScript();
+
+            Utils.WriteLog($"Starting AWS resources timer", "info");
+            _getAWSResourcesTimer.Start();
         }
 
         /// <summary>
@@ -218,8 +238,11 @@ namespace Backend
 
         public async Task GetComparisonResults(string url, string jsonContent)
         {
-            Utils.LoadConfig();
+            // stop aws resource meaurement
+            Utils.WriteLog($"Stopping AWS resources timer", "info");
+            _getAWSResourcesTimer.Stop();
 
+            Utils.LoadConfig();            
             try
             {
                 Utils.WriteLog($"-----GET COMPARE RESULTS BEGIN-----", "info");
@@ -270,7 +293,7 @@ namespace Backend
                     //Utils.WriteToFile(jsonFileByDevice, jsonContentByDevice, append: false);
                     Utils.WriteRecordsToCsv(csvFileByDevice, deviceResultsDict[deviceName]);
                 }
-Utils.WriteLog($"Comparison files was received from agent {url}", "info");
+                Utils.WriteLog($"Comparison files was received from agent {url}", "info");
             }
             catch (Exception ex)
             {
@@ -480,6 +503,68 @@ Utils.WriteLog($"Comparison files was received from agent {url}", "info");
             Utils.WriteToFile(Settings.Get("RETURN_CODE"), returnCode.ToString(), false);
         }
 
+        private void GetAWSMetrics()
+        {
+            try
+            {
+                var instanceIds = Settings.Get("AWS_EC2_INSTANCES").Split(',');
+
+                var client = new AmazonCloudWatchClient(
+                     Settings.Get("AWSAccessKey"),
+                     Settings.Get("AWSSecretKey")
+                     );
+
+
+                foreach (var instanceId in instanceIds)
+                {
+                    var request = new GetMetricStatisticsRequest();
+                    request.MetricName = "CPUUtilization";
+                    request.Period = 60;
+                    request.Statistics.Add("Maximum");
+                    request.Namespace = "AWS/EC2";
+                    request.Unit = "Percent";
+
+                    var dimension = new Dimension
+                    {
+                        Name = "InstanceId",
+                        Value = instanceId,
+                    };
+
+                    request.Dimensions.Add(dimension);
+
+                    var currentTime = DateTime.UtcNow;
+                    var startTime = currentTime.AddMinutes(-20);
+                    string currentTimeString = currentTime.ToString("yyyy-MM-ddTHH:mm:ssZ");
+                    string startTimeString = startTime.ToString("yyyy-MM-ddTHH:mm:ssZ");
+
+                    request.StartTimeUtc = Convert.ToDateTime(startTimeString);
+                    request.EndTimeUtc = Convert.ToDateTime(currentTimeString);
+
+                    var response = client.GetMetricStatisticsAsync(request).Result;
+
+                    if (response.Datapoints.Count > 0)
+                    {
+                        var dataPoint = response.Datapoints[0];
+                        if (_cpuUtilization.ContainsKey(dimension.Value))
+                        {
+                            if (_cpuUtilization[dimension.Value] < dataPoint.Maximum)
+                            {
+                                Utils.WriteLog($"Instance: {dimension.Value} CPU Max load increased from: {_cpuUtilization[dimension.Value]} to {dataPoint.Maximum}", "info");
+                                _cpuUtilization[dimension.Value] = dataPoint.Maximum;
+                            }
+                        }
+                        else _cpuUtilization[dimension.Value] = dataPoint.Maximum;
+
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Utils.WriteLog($"Error in GetAWSMetrics: {ex.Message} {ex.StackTrace}", "error");
+            }
+
+        }
+ 
         /// <summary>
         /// Resets backend
         /// </summary>
@@ -496,6 +581,8 @@ Utils.WriteLog($"Comparison files was received from agent {url}", "info");
             File.Delete(returncodePath);
             File.Delete(logfilePath);
         }
+
+
 
         public string TestCommand(string num)
         {

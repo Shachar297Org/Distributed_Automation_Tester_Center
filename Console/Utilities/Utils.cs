@@ -5,12 +5,15 @@ using System.Collections.Generic;
 using System.Configuration;
 using System.Diagnostics;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Console.Utilities
 {
     public static class Utils
     {
+        private static ReaderWriterLockSlim _readWriteLock = new ReaderWriterLockSlim();
+
         /// <summary>
         /// Run Windows command in background and wait until it finishes
         /// </summary>
@@ -36,18 +39,12 @@ namespace Console.Utilities
                 using (StreamReader reader = process.StandardOutput)
                 {
                     string output = reader.ReadToEnd();
-                    using (StreamWriter writer = new StreamWriter(outputFile, append: true))
-                    {
-                        writer.Write(output);
-                    }
+                    WriteToFile(outputFile, output, append: true);
                 }
                 using (StreamReader reader = process.StandardError)
                 {
                     string output = reader.ReadToEnd();
-                    using (StreamWriter writer = new StreamWriter(outputFile, append: true))
-                    {
-                        writer.Write(output);
-                    }
+                    WriteToFile(outputFile, output, append: true);
                 }
                 //process.ErrorDataReceived += Process_ErrorDataReceived;
                 returnCode = process.ExitCode;
@@ -84,19 +81,13 @@ namespace Console.Utilities
                         string output = reader.ReadToEnd();
                         if (outputFile != null)
                         {
-                            using (StreamWriter writer = new StreamWriter(outputFile, append: true))
-                            {
-                                writer.Write(output);
-                            }
+                            WriteToFile(outputFile, output, append: true);
                         }
                     }
                     using (StreamReader reader = process.StandardError)
                     {
                         string output = reader.ReadToEnd();
-                        using (StreamWriter writer = new StreamWriter(outputFile, append: true))
-                        {
-                            writer.Write(output);
-                        }
+                        WriteToFile(outputFile, output, append: true);
                     }
                     returnCode = process.ExitCode;
                 }
@@ -144,10 +135,7 @@ namespace Console.Utilities
         public static void WriteAgentListToFile(List<Agent> list, string agentsFilePath)
         {
             string jsonObj = JsonConvert.SerializeObject(list);
-            using (StreamWriter writer = new StreamWriter(agentsFilePath))
-            {
-                writer.Write(jsonObj);
-            }
+            WriteToFile(agentsFilePath, jsonObj, false);
         }
 
         /// <summary>
@@ -174,10 +162,19 @@ namespace Console.Utilities
         /// <param name="append">append to file or not</param>
         public static void WriteToFile(string filePath, string content, bool append)
         {
-            using (StreamWriter writer = new StreamWriter(filePath, append))
+            _readWriteLock.EnterWriteLock();
+            try
             {
-                writer.Write(content);
+                using (StreamWriter writer = new StreamWriter(filePath, append))
+                {
+                    writer.Write(content);
+                }
             }
+            finally
+            {
+                _readWriteLock.ExitWriteLock();
+            }
+            
         }
 
         public static void LoadConfig()

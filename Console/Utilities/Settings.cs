@@ -15,7 +15,7 @@ namespace Console.Utilities
             }
             else
             {
-                throw new Exception("Setting key does not exist");
+                throw new Exception($"Setting key {key} does not exist");
             }
         }
     }
