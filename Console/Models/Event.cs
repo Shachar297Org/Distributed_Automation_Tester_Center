@@ -1,5 +1,4 @@
-﻿using Newtonsoft.Json;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Text;
 
@@ -7,8 +6,19 @@ namespace Console.Models
 {
     public class Event
     {
-        [JsonProperty("deviceType")]
-        public string EventDeviceType { get; set; }
+        public Event(string ga, string sn, string ekey, string evalue, DateTime time)
+        {
+            EventDeviceType = ga;
+            EventDeviceSerialNumber = sn;
+            EventKey = ekey;
+            EventValue = evalue;
+            CreationTime = time;
+        }
+
+
+  
+        [JsonProperty("deviceType")]        
+	public string EventDeviceType { get; set; }
 
         [JsonProperty("deviceSerialNumber")]
         public string EventDeviceSerialNumber { get; set; }
