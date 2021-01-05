@@ -153,13 +153,16 @@ namespace Backend
                     Utils.WriteLog($"Agent {agentUrl} is connecting...", "info");   
 
                     Utils.WriteLog($"Agent {agentUrl}: entering critical code...", "info");
-                    // Init agents file when first agent is connecting
-                    //_agents = Utils.ReadAgentsFromFile(agentsFilePath);
 
                     Utils.WriteLog($"Current agents number: {_agents.Count}.", "info");
                     if (_agents.Count == 0)
                     {
                         Init();
+                    }
+
+                    if (Settings.Get("MODE").ToLower() == "debug")
+                    {
+                        agentUrl = agentUrl.Replace("127.0.0.1", "localhost").Replace("::1", "localhost");
                     }
 
                     Agent agent = _agents.Find(a => a.URL == agentUrl);
@@ -168,11 +171,7 @@ namespace Backend
                         Utils.WriteLog($"Agent {agentUrl} already exists.", "info");
                     }
                     else
-                    {
-                        if (Settings.Get("MODE").ToLower() == "debug")
-                        {
-                            agentUrl = agentUrl.Replace("127.0.0.1", "localhost").Replace("::1", "localhost");
-                        }
+                    {       
                         string[] urlStrings = agentUrl.Split(':');
                         Utils.WriteLog($"Adding agent {agentUrl} to pool.", "info");
                         _agents.Add(new Agent(urlStrings[0], int.Parse(urlStrings[1]), false));
@@ -582,12 +581,9 @@ namespace Backend
             File.Delete(logfilePath);
         }
 
-
-
         public string TestCommand(string num)
         {
             Utils.LoadConfig();
-
 
             try
             {
