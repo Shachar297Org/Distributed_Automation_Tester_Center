@@ -59,7 +59,18 @@ namespace Backend
                 _getAgentConnectTimer.Start();
                 Utils.WriteLog("*****Connect timer start*****", "info");
 
+                var devicesLogsFolder = Settings.Get("DEVICE_LOGS_DIR");
+                if (Directory.Exists(devicesLogsFolder))
+                {
+                    CleanUpFolderContent(devicesLogsFolder);
+                }
                 
+                var devicesResultsFolder = Settings.Get("DEVICE_RESULTS_DIR");
+                if (Directory.Exists(devicesLogsFolder))
+                {
+                    CleanUpFolderContent(devicesResultsFolder);
+                }
+
                 Task t = Task.Factory.StartNew(() =>
                 {
                     InsertDevicesToPortal(Settings.Get("CONFIG_FILE"), InsertionStrategy.union);
@@ -94,6 +105,21 @@ namespace Backend
         private void GetAWSResourcesTimer_Elapsed(object sender, ElapsedEventArgs e)
         {
             GetAWSMetrics();
+        }
+
+        private void CleanUpFolderContent(string folderPath)
+        {
+
+            DirectoryInfo di = new DirectoryInfo(folderPath);
+
+            foreach (FileInfo file in di.EnumerateFiles())
+            {
+                file.Delete();
+            }
+            foreach (DirectoryInfo dir in di.EnumerateDirectories())
+            {
+                dir.Delete(true);
+            }
         }
 
         /// <summary>

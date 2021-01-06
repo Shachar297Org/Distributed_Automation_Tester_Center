@@ -17,7 +17,7 @@ namespace Console.Models
         }
   
         [JsonProperty("deviceType")]        
-	public string EventDeviceType { get; set; }
+	    public string EventDeviceType { get; set; }
 
         [JsonProperty("deviceSerialNumber")]
         public string EventDeviceSerialNumber { get; set; }
