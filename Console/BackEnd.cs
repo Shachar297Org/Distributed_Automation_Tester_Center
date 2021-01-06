@@ -71,19 +71,37 @@ namespace Backend
                     CleanUpFolderContent(devicesResultsFolder);
                 }
 
-                Task t = Task.Factory.StartNew(() =>
+                try
                 {
-                    InsertDevicesToPortal(Settings.Get("CONFIG_FILE"), InsertionStrategy.union);
-                });
-                if(t.Wait(new TimeSpan(0, 5, 0)))
-                {
-                    Utils.WriteLog("---Inserting devices finished within 5 min", "info");
+                    var skipInsert = bool.Parse(Settings.Get("SKIP_INSERT_FROM_API"));
+
+                    if (!skipInsert)
+                    {
+                        Task t = Task.Factory.StartNew(() =>
+                        {
+                            InsertDevicesToPortal(Settings.Get("CONFIG_FILE"), InsertionStrategy.union);
+                        });
+                        if (t.Wait(new TimeSpan(0, 5, 0)))
+                        {
+                            Utils.WriteLog("---Inserting devices finished within 5 min", "info");
+                        }
+                        else
+                        {
+                            Utils.WriteLog("---Inserting devices didn't finished within 5 min", "info");
+                        }
+                    }
+                    else
+                    {
+                        Utils.WriteLog("Skipped inserting the devices from API...", "info");
+                    }
+                    
                 }
-                else
+                catch (Exception ex)
                 {
-                    Utils.WriteLog("---Inserting devices didn't finished within 5 min", "info");
-                }           
-               
+                    Utils.WriteLog(ex.Message, "error");
+                    Utils.WriteLog(ex.StackTrace, "error");
+                }
+                               
 
                 // Measure cpuUtilization
                 GetAWSMetrics();
