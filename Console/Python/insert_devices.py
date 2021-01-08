@@ -248,6 +248,8 @@ if __name__ == "__main__":
         #InsertDevices(accessToken, env, newDevices, config)
 
         print('-----success-----')
+        exit(0)
+
     except Exception as ex:
         print('Error: {}'.format(ex))
         traceback.print_exc()

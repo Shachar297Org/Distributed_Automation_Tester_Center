@@ -17,7 +17,7 @@ namespace Shared
 
         Task GetComparisonResults(string url, string jsonContent);
 
-        void Init();
+        Task Init();
 
         string TestCommand(string num);
 

@@ -11,13 +11,14 @@ using System.Threading.Tasks;
 using Amazon.CloudWatch;
 using Amazon.CloudWatch.Model;
 using System.Timers;
+using System.Threading;
 
 namespace Backend
 {
     public class BackEnd : IBackEndInterfaces
     {
-        private static System.Timers.Timer _getAgentConnectTimer = new System.Timers.Timer(new TimeSpan(0, 10, 0).TotalMilliseconds);
-        private static System.Timers.Timer _getAgentReadyTimer = new System.Timers.Timer(new TimeSpan(0, 10, 0).TotalMilliseconds);
+        private static System.Timers.Timer _getAgentConnectTimer = new System.Timers.Timer(new TimeSpan(0, 5, 0).TotalMilliseconds);
+        private static System.Timers.Timer _getAgentReadyTimer = new System.Timers.Timer(new TimeSpan(0, 5, 0).TotalMilliseconds);
         private static System.Timers.Timer _getAWSResourcesTimer = new System.Timers.Timer(new TimeSpan(0, 1, 0).TotalMilliseconds);
 
         private static List<Agent> _agents = new List<Agent>();
@@ -25,6 +26,8 @@ namespace Backend
         private static Dictionary<string, double> _cpuUtilization = new Dictionary<string, double>();
 
         private static object _lock = new object();
+
+        static SemaphoreSlim semaphoreSlim = new SemaphoreSlim(1, 1);
 
         enum DeviceData
         {
@@ -46,7 +49,7 @@ namespace Backend
         /// Insert devices to portal
         /// Collect AWS services and instances
         /// </summary>
-        public void Init()
+        public async Task Init()
         {
             Utils.LoadConfig();
             try
@@ -66,7 +69,7 @@ namespace Backend
                 }
                 
                 var devicesResultsFolder = Settings.Get("DEVICE_RESULTS_DIR");
-                if (Directory.Exists(devicesLogsFolder))
+                if (Directory.Exists(devicesResultsFolder))
                 {
                     CleanUpFolderContent(devicesResultsFolder);
                 }
@@ -77,18 +80,8 @@ namespace Backend
 
                     if (!skipInsert)
                     {
-                        Task t = Task.Factory.StartNew(() =>
-                        {
-                            InsertDevicesToPortal(Settings.Get("CONFIG_FILE"), InsertionStrategy.union);
-                        });
-                        if (t.Wait(new TimeSpan(0, 5, 0)))
-                        {
-                            Utils.WriteLog("---Inserting devices finished within 5 min", "info");
-                        }
-                        else
-                        {
-                            Utils.WriteLog("---Inserting devices didn't finished within 5 min", "info");
-                        }
+                        await InsertDevicesToPortal(Settings.Get("CONFIG_FILE"), InsertionStrategy.union);
+
                     }
                     else
                     {
@@ -178,59 +171,60 @@ namespace Backend
         /// <returns>true/false if connection succeeded</returns>
         public async Task<bool> Connect(string agentUrl)
         {
-            lock (_lock)
+            await semaphoreSlim.WaitAsync();
+
+            try
             {
                 Utils.LoadConfig();
-                try
+
+                Utils.WriteLog($"-----CONNECT STAGE BEGIN-----", "info");
+                string agentsPath = Settings.Get("AGENTS_PATH");
+                Utils.WriteLog($"Received agent connect from {agentUrl}.", "info");
+                string agentsFilePath = Settings.Get("AGENTS_PATH");
+
+                Utils.WriteLog($"Agent {agentUrl} is connecting...", "info");   
+
+                Utils.WriteLog($"Agent {agentUrl}: entering critical code...", "info");
+
+                Utils.WriteLog($"Current agents number: {_agents.Count}.", "info");
+                if (_agents.Count == 0)
                 {
-                    Utils.WriteLog($"-----CONNECT STAGE BEGIN-----", "info");
-                    string agentsPath = Settings.Get("AGENTS_PATH");
-                    Utils.WriteLog($"Received agent connect from {agentUrl}.", "info");
-                    string agentsFilePath = Settings.Get("AGENTS_PATH");
-
-                    Utils.WriteLog($"Agent {agentUrl} is connecting...", "info");   
-
-                    Utils.WriteLog($"Agent {agentUrl}: entering critical code...", "info");
-
-                    Utils.WriteLog($"Current agents number: {_agents.Count}.", "info");
-                    if (_agents.Count == 0)
-                    {
-                        Init();
-                    }
-
-                    if (Settings.Get("MODE").ToLower() == "debug")
-                    {
-                        agentUrl = agentUrl.Replace("127.0.0.1", "localhost").Replace("::1", "localhost");
-                    }
-
-                    Agent agent = _agents.Find(a => a.URL == agentUrl);
-                    if (agent != null)
-                    {
-                        Utils.WriteLog($"Agent {agentUrl} already exists.", "info");
-                    }
-                    else
-                    {       
-                        string[] urlStrings = agentUrl.Split(':');
-                        Utils.WriteLog($"Adding agent {agentUrl} to pool.", "info");
-                        _agents.Add(new Agent(urlStrings[0], int.Parse(urlStrings[1]), false));
-                        Utils.WriteLog($"Agents count: {_agents.Count}.", "info");
-                        //Utils.WriteAgentListToFile(_agents, agentsFilePath);
-                    }
-                    Utils.WriteLog($"Agent {agentUrl}: exiting critical code...", "info");
-
-                    Utils.WriteLog($"Agent {agentUrl} was connected successfully.", "info");
-
-                    return true;
+                    await Init();
                 }
-                catch (Exception ex)
+
+                if (Settings.Get("MODE").ToLower() == "debug")
                 {
-                    Utils.WriteLog($"Error in connect: {ex.Message} {ex.StackTrace}", "error");
-                    return false;
+                    agentUrl = agentUrl.Replace("127.0.0.1", "localhost").Replace("::1", "localhost");
                 }
-                finally
+
+                Agent agent = _agents.Find(a => a.URL == agentUrl);
+                if (agent != null)
                 {
-                    Utils.WriteLog($"-----CONNECT STAGE END-----", "info");
+                    Utils.WriteLog($"Agent {agentUrl} already exists.", "info");
                 }
+                else
+                {       
+                    string[] urlStrings = agentUrl.Split(':');
+                    Utils.WriteLog($"Adding agent {agentUrl} to pool.", "info");
+                    _agents.Add(new Agent(urlStrings[0], int.Parse(urlStrings[1]), false));
+                    Utils.WriteLog($"Agents count: {_agents.Count}.", "info");
+                    //Utils.WriteAgentListToFile(_agents, agentsFilePath);
+                }
+                Utils.WriteLog($"Agent {agentUrl}: exiting critical code...", "info");
+
+                Utils.WriteLog($"Agent {agentUrl} was connected successfully.", "info");
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Utils.WriteLog($"Error in connect: {ex.Message} {ex.StackTrace}", "error");
+                return false;
+            }
+            finally
+            {
+                Utils.WriteLog($"-----CONNECT STAGE END-----", "info");
+                semaphoreSlim.Release();
             }
         }
 
@@ -403,7 +397,7 @@ namespace Backend
         /// </summary>
         /// <param name="env">env value (dev/staging/int)</param>
         /// <param name="devicesCsvFile">csv file containing devices to insert</param>
-        private void InsertDevicesToPortal(string configFile, InsertionStrategy strategy)
+        private async Task<bool> InsertDevicesToPortal(string configFile, InsertionStrategy strategy, int? timeout=null)
         {
             try
             {
@@ -412,11 +406,17 @@ namespace Backend
                 string pythonScriptsFolder = Settings.Get("PYTHON_SCRIPTS_PATH");
                 string pythonExePath = Settings.Get("PYTHON");
                 Utils.WriteLog($"Python exe path: {pythonExePath}", "info");
-                Utils.RunCommand(pythonExePath, "insert_devices.py", $"{configFile} {strategy}", pythonScriptsFolder, Settings.Get("OUTPUT"));                
+                var result = await Utils.RunCommandAsync(pythonExePath, "insert_devices.py", $"{configFile} {strategy}", pythonScriptsFolder, Settings.Get("OUTPUT"));
+
+                var resultStr = result==1 ? "not completed" : "completed";
+                Utils.WriteLog($"Insertion has {resultStr} successfully", "info");
+
+                return result == 0;
             }
             catch (Exception ex)
             {
                 Utils.WriteLog($"Error in insertDevices: {ex.Message} {ex.StackTrace}", "error");
+                return false;
             }
             finally
             {
