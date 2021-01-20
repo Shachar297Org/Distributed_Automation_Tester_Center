@@ -213,16 +213,16 @@ if __name__ == "__main__":
             print('Delta Devices AWS: {}'.format(deltaDevicesAws))
 
             InsertDevices(accessToken, env, deltaDevicesCsv, config)
-            #DeleteDevices(accessToken, deltaDevicesAws, config)
-            #DeleteDevices(accessToken, csvDeviceRecords, config)
+            DeleteDevices(accessToken, deltaDevicesAws, config)
+            DeleteDevices(accessToken, csvDeviceRecords, config)
 
             pass
         elif strategy == 'all_new':
             # delete all from aws
             # insert all from csv
 
-            #DeleteDevices(accessToken, portalDeviceRecords, config)
-            #InsertDevices(accessToken, env, csvDeviceRecords, config)
+            DeleteDevices(accessToken, portalDeviceRecords, config)
+            InsertDevices(accessToken, env, csvDeviceRecords, config)
 
             pass
         elif strategy == 'union':

@@ -63,7 +63,7 @@ namespace Console.Utilities
         /// <param name="args">arguments</param>
         /// <param name="outputFile">Output file path</param>
         /// <returns>Command return code</returns>
-        public static async Task<int> RunCommandAsync(string exeFile, string cmd, string args, string cwd, string outputFile)
+        public static async Task RunCommandAsync(string exeFile, string cmd, string args, string cwd, string outputFile)
         {
             ProcessStartInfo start = new ProcessStartInfo();
             start.FileName = exeFile;
@@ -77,11 +77,7 @@ namespace Console.Utilities
 
             WriteToFile(outputFile, result.StdOut, append: true);
             WriteToFile(outputFile, result.StdErr, append: true);
-
-            var res = result.ExitCode ?? 1;
-
-            return res;
-
+            
         }
 
         private static void Process_ErrorDataReceived(object sender, DataReceivedEventArgs e)

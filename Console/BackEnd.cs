@@ -27,7 +27,7 @@ namespace Backend
 
         private static object _lock = new object();
 
-        static SemaphoreSlim semaphoreSlim = new SemaphoreSlim(1, 1);
+        private static SemaphoreSlim semaphoreSlim = new SemaphoreSlim(1, 1);
 
         enum DeviceData
         {
@@ -80,7 +80,9 @@ namespace Backend
 
                     if (!skipInsert)
                     {
-                        await InsertDevicesToPortal(Settings.Get("CONFIG_FILE"), InsertionStrategy.union);
+                        var mode = (InsertionStrategy)int.Parse(Settings.Get("INSERTION_STRATEGY"));
+
+                        InsertDevicesToPortal(Settings.Get("CONFIG_FILE"), mode);
 
                     }
                     else
@@ -94,10 +96,10 @@ namespace Backend
                     Utils.WriteLog(ex.Message, "error");
                     Utils.WriteLog(ex.StackTrace, "error");
                 }
-                               
 
-                // Measure cpuUtilization
-                GetAWSMetrics();
+
+                // Measure services
+                GetAWSECSMetrics();
 
                 //InsertDevicesToPortal(Settings.Get("ENV"), Settings.Get("DEVICES_PATH"));
                 //CollectAWSServices(Settings.Get("ENV"));
@@ -115,7 +117,7 @@ namespace Backend
 
         private void GetAWSResourcesTimer_Elapsed(object sender, ElapsedEventArgs e)
         {
-            GetAWSMetrics();
+            GetAWSECSMetrics();
         }
 
         private void CleanUpFolderContent(string folderPath)
@@ -269,9 +271,6 @@ namespace Backend
 
         public async Task GetComparisonResults(string url, string jsonContent)
         {
-            // stop aws resource meaurement
-            Utils.WriteLog($"Stopping AWS resources timer", "info");
-            _getAWSResourcesTimer.Stop();
 
             Utils.LoadConfig();            
             try
@@ -397,7 +396,7 @@ namespace Backend
         /// </summary>
         /// <param name="env">env value (dev/staging/int)</param>
         /// <param name="devicesCsvFile">csv file containing devices to insert</param>
-        private async Task<bool> InsertDevicesToPortal(string configFile, InsertionStrategy strategy, int? timeout=null)
+        private bool InsertDevicesToPortal(string configFile, InsertionStrategy strategy, int? timeout=null)
         {
             try
             {
@@ -406,7 +405,7 @@ namespace Backend
                 string pythonScriptsFolder = Settings.Get("PYTHON_SCRIPTS_PATH");
                 string pythonExePath = Settings.Get("PYTHON");
                 Utils.WriteLog($"Python exe path: {pythonExePath}", "info");
-                var result = await Utils.RunCommandAsync(pythonExePath, "insert_devices.py", $"{configFile} {strategy}", pythonScriptsFolder, Settings.Get("OUTPUT"));
+                var result = Utils.RunCommand(pythonExePath, "insert_devices.py", $"{configFile} {strategy}", pythonScriptsFolder, Settings.Get("OUTPUT"));
 
                 var resultStr = result==1 ? "not completed" : "completed";
                 Utils.WriteLog($"Insertion has {resultStr} successfully", "info");
@@ -542,6 +541,7 @@ namespace Backend
 
         private void GetAWSMetrics()
         {
+
             try
             {
                 var instanceIds = Settings.Get("AWS_EC2_INSTANCES").Split(',');
@@ -555,6 +555,7 @@ namespace Backend
                 foreach (var instanceId in instanceIds)
                 {
                     var request = new GetMetricStatisticsRequest();
+                    
                     request.MetricName = "CPUUtilization";
                     request.Period = 60;
                     request.Statistics.Add("Maximum");
@@ -584,7 +585,7 @@ namespace Backend
                         var dataPoint = response.Datapoints[0];
                         if (_cpuUtilization.ContainsKey(dimension.Value))
                         {
-                            if (_cpuUtilization[dimension.Value] < dataPoint.Maximum)
+                            //if (_cpuUtilization[dimension.Value] < dataPoint.Maximum)
                             {
                                 Utils.WriteLog($"Instance: {dimension.Value} CPU Max load increased from: {_cpuUtilization[dimension.Value]} to {dataPoint.Maximum}", "info");
                                 _cpuUtilization[dimension.Value] = dataPoint.Maximum;
@@ -601,7 +602,87 @@ namespace Backend
             }
 
         }
- 
+
+        private void GetAWSECSMetrics()
+        {
+
+            try
+            {
+                var metrics = new[] { "CPUUtilization", "MemoryUtilization" };
+
+                var clasterName = $"{Settings.Get("ENV").ToLower()}-ECS-Cluster";
+                var serviceNames = new[] { $"{Settings.Get("ENV").ToLower()}-Facade-Service" , $"{Settings.Get("ENV").ToLower()}-Device-Service" , $"{Settings.Get("ENV").ToLower()}-Processing-Service" };
+
+                var client = new AmazonCloudWatchClient(
+                     Settings.Get("AWSAccessKey"),
+                     Settings.Get("AWSSecretKey")
+                     );
+
+                foreach (var serviceName in serviceNames)
+                {
+                    foreach (var metric in metrics)
+                    {
+                        var request = new GetMetricStatisticsRequest();
+
+                        request.MetricName = metric;
+                        request.Period = 60;
+                        request.Statistics.Add("Average");
+                        request.Statistics.Add("Maximum");
+                        request.Namespace = "AWS/ECS";
+                        request.Unit = "Percent";
+
+                        var clusterName = new Dimension
+                        {
+                            Name = "ClusterName",
+                            Value = clasterName,
+                        };
+
+                        var service = new Dimension
+                        {
+                            Name = "ServiceName",
+                            Value = serviceName,
+                        };
+
+                        request.Dimensions.Add(service);
+
+                        var currentTime = DateTime.UtcNow;
+                        var startTime = currentTime.AddMinutes(-20);
+                        string currentTimeString = currentTime.ToString("yyyy-MM-ddTHH:mm:ssZ");
+                        string startTimeString = startTime.ToString("yyyy-MM-ddTHH:mm:ssZ");
+
+                        request.StartTimeUtc = Convert.ToDateTime(startTimeString);
+                        request.EndTimeUtc = Convert.ToDateTime(currentTimeString);
+
+                        var response = client.GetMetricStatisticsAsync(request).Result;
+                        var resonseData = response.Datapoints.OrderByDescending(x => x.Timestamp).ToList();
+
+                        if (resonseData.Count > 0)
+                        {
+                            var dataPoint = response.Datapoints[0];
+                            //if (_cpuUtilization.ContainsKey(serviceName))
+                            {
+                                //if (_cpuUtilization[dimension.Value] < dataPoint.Maximum)
+                                {
+                                    Utils.WriteLog($"{serviceName} {metric}: Max = {dataPoint.Maximum} Average = {dataPoint.Average} ", "info");
+                                    //_cpuUtilization[serviceName] = dataPoint.Maximum;
+                                }
+                            }
+                            // else _cpuUtilization[dimension.Value] = dataPoint.Maximum;
+
+                        }
+                    }
+
+                }             
+                
+            
+            }
+            catch (Exception ex)
+            {
+                Utils.WriteLog($"Error in GetAWSMetrics: {ex.Message} {ex.StackTrace}", "error");
+            }
+
+        }
+
         /// <summary>
         /// Resets backend
         /// </summary>
