@@ -17,15 +17,12 @@ namespace Backend
 {
     public class BackEnd : IBackEndInterfaces
     {
-        private static System.Timers.Timer _getAgentConnectTimer = new System.Timers.Timer(new TimeSpan(0, 5, 0).TotalMilliseconds);
-        private static System.Timers.Timer _getAgentReadyTimer = new System.Timers.Timer(new TimeSpan(0, 5, 0).TotalMilliseconds);
+        private static System.Timers.Timer _getAgentConnectTimer = null;
         private static System.Timers.Timer _getAWSResourcesTimer = new System.Timers.Timer(new TimeSpan(0, 1, 0).TotalMilliseconds);
 
         private static List<Agent> _agents = new List<Agent>();
-        private static List<Device> _devices = null;
+        private static HashSet<Device> _devices = new HashSet<Device>();
         private static Dictionary<string, double> _cpuUtilization = new Dictionary<string, double>();
-
-        private static object _lock = new object();
 
         private static SemaphoreSlim semaphoreSlim = new SemaphoreSlim(1, 1);
 
@@ -42,6 +39,7 @@ namespace Backend
             union
         }
 
+
         /// <summary>
         /// Initialize backend:
         /// Create two timers - first agent connection and ready timers
@@ -55,12 +53,14 @@ namespace Backend
             try
             {
                 Utils.WriteLog($"-----INIT STAGE BEGIN-----", "info");
+
+                int minutesToConnect = int.Parse(Settings.Get("MINUTES_TO_CONNECT"));
+                _getAgentConnectTimer = new System.Timers.Timer(new TimeSpan(0, minutesToConnect, 0).TotalMilliseconds);
+
                 _getAgentConnectTimer.Elapsed += GetAgentConnectTimer_Elapsed;
-                _getAgentReadyTimer.Elapsed += GetAgentReadyTimer_Elapsed;
                 _getAWSResourcesTimer.Elapsed += GetAWSResourcesTimer_Elapsed;
 
-                _getAgentConnectTimer.Start();
-                Utils.WriteLog("*****Connect timer start*****", "info");
+                _getAgentConnectTimer.AutoReset = false;
 
                 var devicesLogsFolder = Settings.Get("DEVICE_LOGS_DIR");
                 if (Directory.Exists(devicesLogsFolder))
@@ -73,6 +73,8 @@ namespace Backend
                 {
                     CleanUpFolderContent(devicesResultsFolder);
                 }
+
+                DevicesFromCsv();
 
                 try
                 {
@@ -89,7 +91,10 @@ namespace Backend
                     {
                         Utils.WriteLog("Skipped inserting the devices from API...", "info");
                     }
-                    
+
+                    _getAgentConnectTimer.Start();
+                    Utils.WriteLog("*****Connect timer start*****", "info");
+
                 }
                 catch (Exception ex)
                 {
@@ -135,6 +140,19 @@ namespace Backend
             }
         }
 
+        private void DevicesFromCsv()
+        {
+            var fileName = Settings.Get("DEVICES_PATH");
+            var lines = File.ReadAllLines(fileName).Skip(1).Select(a => a.Split(','));
+            var devices = from line in lines
+                      select new Device(line[0], line[1]);
+
+            foreach (var device in devices)
+            {
+                _devices.Add(device);
+            }            
+        }
+
         /// <summary>
         /// Distribute devices among devices and wait for agents to be ready
         /// </summary>
@@ -142,28 +160,22 @@ namespace Backend
         /// <param name="e">event</param>
         private void GetAgentConnectTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
         {  
-            _getAgentConnectTimer.Stop();
             Utils.WriteLog($"*****Connect timer stop*****", "info");
             Utils.WriteAgentListToFile(_agents, Settings.Get("AGENTS_PATH"));
-            _getAgentReadyTimer.Start();
-            Utils.WriteLog($"*****Ready timer start*****", "info");
             DistributeDevicesAmongAgents();
         }
 
         /// <summary>
         /// Send automation script to ready agents only
         /// </summary>
-        /// <param name="sender">sender</param>
-        /// <param name="e">event</param>
-        private void GetAgentReadyTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
-        {
-            _getAgentReadyTimer.Stop();
-            Utils.WriteLog($"*****Ready timer stop*****", "info");
+        private void StartSendingScript()
+        { 
             Utils.WriteAgentListToFile(_agents, Settings.Get("AGENTS_PATH"));
-            SendAutomationScript();
 
             Utils.WriteLog($"Starting AWS resources timer", "info");
             _getAWSResourcesTimer.Start();
+
+            SendAutomationScript();
         }
 
         /// <summary>
@@ -236,53 +248,60 @@ namespace Backend
         /// <param name="url">agent URL</param>
         public async Task<bool> AgentReady(string url)
         {
-            lock (_lock)
-            {
+
+             try
+             {
                 Utils.LoadConfig();
-                string agentsFilePath = Settings.Get("AGENTS_PATH"); 
+                string agentsFilePath = Settings.Get("AGENTS_PATH");
 
-                try
-                {
-                    if (Settings.Get("MODE").ToLower() == "debug")
-                    {
-                        url = url.Replace("127.0.0.1", "localhost").Replace("::1", "localhost");
-                    }
 
-                    Utils.WriteLog($"Received agent ready from {url}.", "info");
+                if (Settings.Get("MODE").ToLower() == "debug")
+                 {
+                     url = url.Replace("127.0.0.1", "localhost").Replace("::1", "localhost");
+                 }
 
-                    //_agents = Utils.ReadAgentsFromFile(agentsFilePath);
-                    Agent agent = _agents.Find(a => a.URL == url);
-                    if (agent == null)
-                    {
-                        Utils.WriteLog($"Agent {url} does not exist", "error");
-                    }
-                    agent.IsReady = true;
-                    //Utils.WriteAgentListToFile(_agents, agentsFilePath);
+                 Utils.WriteLog($"Received agent ready from {url}.", "info");
 
-                    return true;
-                }
-                catch (Exception ex)
-                {
-                    Utils.WriteLog($"Error in agentReady: {ex.Message} {ex.StackTrace}", "error");
-                    return false;
-                }                
-            }
+                 Agent agent = _agents.Find(a => a.URL == url);
+                 if (agent == null)
+                 {
+                     Utils.WriteLog($"Agent {url} does not exist", "error");
+                 }
+                 agent.IsReady = true;
+
+                 bool allAgentsAreReady = _agents.All(a => a.IsReady);
+
+                 if (allAgentsAreReady)
+                 {
+                    StartSendingScript();
+                 }
+                 
+                 return true;
+             }
+             catch (Exception ex)
+             {
+                 Utils.WriteLog($"Error in agentReady: {ex.Message} {ex.StackTrace}", "error");
+                 return false;
+             }
+            
         }
 
         public async Task GetComparisonResults(string url, string jsonContent)
         {
 
-            Utils.LoadConfig();            
+            Utils.LoadConfig();
+
             try
             {
-                Utils.WriteLog($"-----GET COMPARE RESULTS BEGIN-----", "info");
-
                 if (Settings.Get("MODE").ToLower() == "debug")
                 {
                     url = url.Replace("127.0.0.1", "localhost").Replace("::1", "localhost");
                 }
 
-                List<Event> events = JsonConvert.DeserializeObject<List<Event>>(jsonContent);
+                var comparisonResults = JsonConvert.DeserializeObject<ComparisonResults>(jsonContent);
+                var events = comparisonResults.Events;
+
+                Utils.WriteLog($"-----GET COMPARE RESULTS FOR {comparisonResults.DeviceName} BEGIN-----", "info");
 
                 string deviceResultsDir = Settings.Get("DEVICE_RESULTS_DIR");
                 if (!Directory.Exists(deviceResultsDir))
@@ -298,7 +317,7 @@ namespace Backend
                     string ga = eventObj.EventDeviceType;
                     string sn = eventObj.EventDeviceSerialNumber;
                     string deviceName = string.Join("_", new string[] { sn, ga });
-                    deviceResultsDict[deviceName] = new List<Event>();
+                    deviceResultsDict[deviceName] = new List<Event>();                    
                 }
 
                 // Fill dictionary of <deviceName, eventsList>
@@ -324,6 +343,9 @@ namespace Backend
                     Utils.WriteRecordsToCsv(csvFileByDevice, deviceResultsDict[deviceName]);
                 }
                 Utils.WriteLog($"Comparison files was received from agent {url}", "info");
+
+                Utils.WriteLog($"-----GET COMPARE RESULTS FOR {comparisonResults.DeviceName} END-----", "info");                
+
             }
             catch (Exception ex)
             {
@@ -331,7 +353,7 @@ namespace Backend
             }
             finally
             {
-                Utils.WriteLog($"-----GET COMPARE RESULTS END-----", "info");
+                
             }
         }
 
@@ -346,8 +368,7 @@ namespace Backend
             Utils.LoadConfig();
 
             try
-            {
-                Utils.WriteLog($"-----GET SCRIPT LOG BEGIN-----", "info");
+            {              
 
                 if (Settings.Get("MODE").ToLower() == "debug")
                 {
@@ -364,10 +385,19 @@ namespace Backend
                 string deviceName = scriptLogObj.DeviceName;
                 string logContent = scriptLogObj.Content;
 
+                Utils.WriteLog($"-----GET SCRIPT LOG FOR {deviceName} BEGIN-----", "info");
+
                 string logFilePath = Path.Combine(deviceLogsDir, deviceName + "_log.txt");
 
                 Utils.WriteToFile(logFilePath, logContent, append: false);
                 Utils.WriteLog($"Log file was received from agent {url}", "info");
+
+                Utils.WriteLog($"-----GET SCRIPT LOG FOR {deviceName} END-----", "info");
+
+                var deviceType = deviceName.Split('_')[1];
+                var deviceSerialNumber = deviceName.Split('_')[0];
+
+                _devices.RemoveWhere(d => d.DeviceType == deviceType && d.DeviceSerialNumber == deviceSerialNumber);
             }
             catch (Exception ex)
             {
@@ -375,7 +405,11 @@ namespace Backend
             }
             finally
             {
-                Utils.WriteLog($"-----GET SCRIPT LOG END-----", "info");
+                if (_devices.Count == 0)
+                {
+                    _getAWSResourcesTimer.Stop();
+                    Utils.WriteLog($"Stopping AWS resources timer", "info");
+                }
             }
         }
 
@@ -385,10 +419,6 @@ namespace Backend
             return agentUrls;
         }
 
-        public List<Device> GetDevices()
-        {
-            return _devices;
-        }
 
         /// <summary>
         /// Retrieve all devices from portal, read devices from csv file,
@@ -610,13 +640,15 @@ namespace Backend
             {
                 var metrics = new[] { "CPUUtilization", "MemoryUtilization" };
 
-                var clasterName = $"{Settings.Get("ENV").ToLower()}-ECS-Cluster";
+                var clusterName = $"{Settings.Get("ENV").ToLower()}-ECS-Cluster";
                 var serviceNames = new[] { $"{Settings.Get("ENV").ToLower()}-Facade-Service" , $"{Settings.Get("ENV").ToLower()}-Device-Service" , $"{Settings.Get("ENV").ToLower()}-Processing-Service" };
 
                 var client = new AmazonCloudWatchClient(
                      Settings.Get("AWSAccessKey"),
                      Settings.Get("AWSSecretKey")
                      );
+
+                Utils.WriteLog("---------------------------------------------------------------", "info");
 
                 foreach (var serviceName in serviceNames)
                 {
@@ -631,10 +663,10 @@ namespace Backend
                         request.Namespace = "AWS/ECS";
                         request.Unit = "Percent";
 
-                        var clusterName = new Dimension
+                        var cluster = new Dimension
                         {
                             Name = "ClusterName",
-                            Value = clasterName,
+                            Value = clusterName,
                         };
 
                         var service = new Dimension
@@ -643,10 +675,11 @@ namespace Backend
                             Value = serviceName,
                         };
 
+                        request.Dimensions.Add(cluster);
                         request.Dimensions.Add(service);
 
                         var currentTime = DateTime.UtcNow;
-                        var startTime = currentTime.AddMinutes(-20);
+                        var startTime = currentTime.AddMinutes(-5);
                         string currentTimeString = currentTime.ToString("yyyy-MM-ddTHH:mm:ssZ");
                         string startTimeString = startTime.ToString("yyyy-MM-ddTHH:mm:ssZ");
 
@@ -672,9 +705,10 @@ namespace Backend
                         }
                     }
 
-                }             
-                
-            
+                }
+
+                Utils.WriteLog("---------------------------------------------------------------", "info");
+
             }
             catch (Exception ex)
             {

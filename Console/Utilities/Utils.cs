@@ -180,11 +180,19 @@ namespace Console.Utilities
 
         public static void WriteLog(string msg, string level)
         {
-            using (StreamWriter writer = new StreamWriter(Settings.Get("LOG_FILE_PATH"), append: true))
+            _readWriteLock.EnterWriteLock();
+            try
             {
-                string nowTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-                writer.WriteLine($"{nowTime} [{level.ToUpper()}] : {msg}");
+                using (StreamWriter writer = new StreamWriter(Settings.Get("LOG_FILE_PATH"), append: true))
+                {
+                    string nowTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                    writer.WriteLine($"{nowTime} [{level.ToUpper()}] : {msg}");
+                }
             }
+            finally
+            {
+                _readWriteLock.ExitWriteLock();
+            }               
         }
 
         public static void WriteRecordsToCsv(string csvFileByDevice, List<Event> events)
