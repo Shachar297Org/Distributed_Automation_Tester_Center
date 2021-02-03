@@ -1,10 +1,10 @@
 
 
-def SendScriptToAgent(agentRec: dict, scriptContent: str):
+def SendScriptToAgent(agentRec: dict, scriptContent: str, delayBeforeStoppingServer: int):
     print(
         'Sending activation script to agent {}'.format(agentRec['URL']), 'info')
     r = requests.post(
-        url='http://{}:{}/sendScript'.format(agentRec['AgentIP'], agentRec['AgentPort']), json={'Type': 'txt', 'Content': scriptContent})
+        url='http://{}:{}/sendScript'.format(agentRec['AgentIP'], agentRec['AgentPort']), json={'Type': 'txt', 'Content': scriptContent, 'StoppingDelay' : delayBeforeStoppingServer})
     if r.status_code == 200:
         print('Script was recieved at agent {}'.format(
             agentRec['URL']), 'info')
@@ -12,10 +12,10 @@ def SendScriptToAgent(agentRec: dict, scriptContent: str):
         print('Error: {}: {}'.format(r.status_code, r.reason))
 
 
-def SendScriptToAgents(agentRecords: list, scriptContent: str):
+def SendScriptToAgents(agentRecords: list, scriptContent: str, delayBeforeStoppingServer: int):
     for agentRec in agentRecords:
         if agentRec['IsReady']:
-            SendScriptToAgent(agentRec, scriptContent)
+            SendScriptToAgent(agentRec, scriptContent, delayBeforeStoppingServer)
 
 
 if __name__ == "__main__":
@@ -40,11 +40,15 @@ if __name__ == "__main__":
 
         agentsFile = config['AGENTS_PATH']
         scriptFile = config['ACTIVATION_SCRIPT_PATH']
+        delayBeforeStoppingServer = 0
+
+        if int(config['SCENARIO']) == 2:
+            delayBeforeStoppingServer = 2*int(config['MINUTES_TO_KEEP_STOPPED'])
 
         agentRecords = ReadRecordsFromJsonFile(agentsFile)
         scriptContent = ReadContentFromFile(scriptFile)
 
-        SendScriptToAgents(agentRecords, scriptContent)
+        SendScriptToAgents(agentRecords, scriptContent, delayBeforeStoppingServer)
         print('-----success-----')
 
     except Exception as ex:

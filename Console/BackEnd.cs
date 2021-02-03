@@ -10,8 +10,11 @@ using System.Linq;
 using System.Threading.Tasks;
 using Amazon.CloudWatch;
 using Amazon.CloudWatch.Model;
+using Amazon.ECS;
+using Amazon.Runtime;
 using System.Timers;
 using System.Threading;
+
 
 namespace Backend
 {
@@ -20,11 +23,18 @@ namespace Backend
         private static System.Timers.Timer _getAgentConnectTimer = null;
         private static System.Timers.Timer _getAWSResourcesTimer = new System.Timers.Timer(new TimeSpan(0, 1, 0).TotalMilliseconds);
 
+        private static System.Timers.Timer _stopECSTaskTimer = new System.Timers.Timer(new TimeSpan(0, 1, 0).TotalMilliseconds);
+
+
         private static List<Agent> _agents = new List<Agent>();
-        private static HashSet<Device> _devices = new HashSet<Device>();
+        private static HashSet<LumenisXDevice> _devices = new HashSet<LumenisXDevice>();
         private static Dictionary<string, double> _cpuUtilization = new Dictionary<string, double>();
 
+        private static List<string> _servicesToStop = new List<string>();
+
         private static SemaphoreSlim semaphoreSlim = new SemaphoreSlim(1, 1);
+
+        private static double _stoppedMinutes = 0;
 
         enum DeviceData
         {
@@ -60,6 +70,9 @@ namespace Backend
                 _getAgentConnectTimer.Elapsed += GetAgentConnectTimer_Elapsed;
                 _getAWSResourcesTimer.Elapsed += GetAWSResourcesTimer_Elapsed;
 
+
+                _stopECSTaskTimer.Elapsed += StopECSTimer_Elapsed;
+                _stopECSTaskTimer.AutoReset = false;
                 _getAgentConnectTimer.AutoReset = false;
 
                 var devicesLogsFolder = Settings.Get("DEVICE_LOGS_DIR");
@@ -75,6 +88,8 @@ namespace Backend
                 }
 
                 DevicesFromCsv();
+
+                _servicesToStop = Settings.Get("SERVICES_TO_STOP").Split(',').ToList();
 
                 try
                 {
@@ -120,6 +135,114 @@ namespace Backend
             }
         }
 
+        private void StopECSTimer_Elapsed(object sender, ElapsedEventArgs e)
+        {
+            try
+            {
+                Utils.WriteLog("============================================================", "info");
+
+                var awsEcsClient = new AmazonECSClient(
+                    Settings.Get("AWSAccessKey"),
+                    Settings.Get("AWSSecretKey"));
+
+                var clusterName = $"{Settings.Get("ENV").ToLower()}-ECS-Cluster";
+
+                var describeServiceRequest = new Amazon.ECS.Model.DescribeServicesRequest();
+                describeServiceRequest.Services = _servicesToStop.Select(s => $"{Settings.Get("ENV").ToLower()}-{s}-Service").ToList();
+                describeServiceRequest.Cluster = clusterName;
+
+                var describeServiceResponse = awsEcsClient.DescribeServicesAsync(describeServiceRequest);
+
+                foreach (var ecsService in describeServiceResponse.Result.Services)
+                {
+                    if (ecsService.RunningCount != 0 || ecsService.PendingCount != 0)
+                    {
+                        Utils.WriteLog($"Service {ecsService.ServiceName} has some running tasks...", "info");
+                        StopAWSECSTasks(ecsService.ServiceName).Wait();
+                    }
+                    else
+                    {
+                        Utils.WriteLog($"Service {ecsService} tasks are not up yet. Skipping...", "info");
+                    }
+                }
+
+            }
+            catch(Exception ex)
+            {
+                Utils.WriteLog($"Error in StopECSTime: {ex.Message} {ex.StackTrace}", "error");
+            }
+            finally
+            {
+                Utils.WriteLog("============================================================", "info");
+                var minutesToKeepStopped = int.Parse(Settings.Get("MINUTES_TO_KEEP_STOPPED"));
+                if (_stoppedMinutes <= minutesToKeepStopped)
+                {
+                    _stopECSTaskTimer.Interval = new TimeSpan(0, 0, 30).TotalMilliseconds;
+                    _stopECSTaskTimer.Start();
+                }
+                _stoppedMinutes += 0.5;               
+                
+            }
+        }
+
+        private async Task StopAWSECSTasks(string serviceWhereStopTasks)
+        {
+            try
+            {
+                Utils.WriteLog($"Stopping ALL tasks for service {serviceWhereStopTasks}", "info");
+
+                var clusterName = $"{Settings.Get("ENV").ToLower()}-ECS-Cluster";
+
+                var awsEcsClient = new AmazonECSClient(
+                    Settings.Get("AWSAccessKey"),
+                    Settings.Get("AWSSecretKey"));
+
+                var listTasksRequest = new Amazon.ECS.Model.ListTasksRequest();
+                listTasksRequest.Cluster = clusterName;
+
+                var listTasksResponse = await awsEcsClient.ListTasksAsync(listTasksRequest);
+
+                var describeTasksRequest = new Amazon.ECS.Model.DescribeTasksRequest();
+                describeTasksRequest.Cluster = clusterName;
+                describeTasksRequest.Tasks = listTasksResponse.TaskArns;
+
+                var describeTasksResponse = await awsEcsClient.DescribeTasksAsync(describeTasksRequest);
+                var tasks = describeTasksResponse.Tasks;
+
+                var tasksToStop = tasks.Where(t => t.Group.Contains(serviceWhereStopTasks));                
+
+                foreach (var task in tasksToStop)
+                {
+                    var stopTaskRequst = new Amazon.ECS.Model.StopTaskRequest();
+                    stopTaskRequst.Cluster = clusterName;
+                    stopTaskRequst.Task = task.TaskArn;
+
+                    stopTaskRequst.Reason = $"Stopping task {stopTaskRequst.Task} to test availability";
+
+                    var stopTaskResponse = await awsEcsClient.StopTaskAsync(stopTaskRequst);
+
+                    if (stopTaskResponse.HttpStatusCode == System.Net.HttpStatusCode.OK)
+                    {
+                        Utils.WriteLog($"{stopTaskResponse.Task.TaskArn} was stopped ", "info");
+                    }
+                    else
+                    {
+                        Utils.WriteLog($"Failed to stop task {stopTaskResponse.Task.TaskArn}. Response: {stopTaskResponse.HttpStatusCode}", "info");
+                    }
+                    
+                }
+              
+            }
+            catch(Exception ex)
+            {
+                Utils.WriteLog($"Error in connect: {ex.Message} {ex.StackTrace}", "error");
+            }
+            finally
+            {
+                
+            }            
+        }
+
         private void GetAWSResourcesTimer_Elapsed(object sender, ElapsedEventArgs e)
         {
             GetAWSECSMetrics();
@@ -145,7 +268,7 @@ namespace Backend
             var fileName = Settings.Get("DEVICES_PATH");
             var lines = File.ReadAllLines(fileName).Skip(1).Select(a => a.Split(','));
             var devices = from line in lines
-                      select new Device(line[0], line[1]);
+                      select new LumenisXDevice(line[0], line[1]);
 
             foreach (var device in devices)
             {
@@ -254,7 +377,6 @@ namespace Backend
                 Utils.LoadConfig();
                 string agentsFilePath = Settings.Get("AGENTS_PATH");
 
-
                 if (Settings.Get("MODE").ToLower() == "debug")
                  {
                      url = url.Replace("127.0.0.1", "localhost").Replace("::1", "localhost");
@@ -274,6 +396,13 @@ namespace Backend
                  if (allAgentsAreReady)
                  {
                     StartSendingScript();
+                    var scenario = int.Parse(Settings.Get("SCENARIO"));
+
+                    if (scenario == 2)
+                    {            
+
+                        _stopECSTaskTimer.Start();
+                    }
                  }
                  
                  return true;

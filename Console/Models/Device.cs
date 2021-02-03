@@ -4,9 +4,9 @@ using System.Text;
 
 namespace Console.Models
 {
-    public class Device
+    public class LumenisXDevice
     {
-        public Device(string ga, string sn)
+        public LumenisXDevice(string ga, string sn)
         {
             DeviceType = ga;
             DeviceSerialNumber = sn;
