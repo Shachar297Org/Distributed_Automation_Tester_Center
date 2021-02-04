@@ -12,26 +12,45 @@ def DivideDevicesAmongAgents(deviceRecords, agentRecords):
         agentRecords[agentIndex]['devicesList'].append(deviceRec)
         agentIndex = (agentIndex + 1) % len(agentRecords)
 
+def SendDevice(agentRec):
+    r = requests.post('http://{}:{}/sendDevices'.format(
+            agentRec['AgentIP'], agentRec['AgentPort']), json=agentRec['devicesList'])
+    
+    print('Send json file of devices to agent in url {}'.format(agentRec['URL']))
+    print('Request url: {}:{}'.format(
+        agentRec['AgentIP'], agentRec['AgentPort']))
+    print('Send devices: {}'.format(agentRec['devicesList']))
+
+    if r.status_code == 200:
+        print(
+            'Agent {} received device list'.format(agentRec['URL']))
+    else:
+        print('Error occured: {}'.format(r))    
 
 def DistributeDevices(deviceRecords, agentRecords):
     """
     Send to every connected agent a list of devices in json format
     """
+    from joblib import Parallel, delayed
+
     print('Divide devices among agents.')
     DivideDevicesAmongAgents(deviceRecords, agentRecords)
-    for agentRec in agentRecords:
-        print(
-            'Send json file of devices to agent in url {}'.format(agentRec['URL']))
-        print('Request url: {}:{}'.format(
-            agentRec['AgentIP'], agentRec['AgentPort']))
-        print('Send devices: {}'.format(agentRec['devicesList']))
-        r = requests.post('http://{}:{}/sendDevices'.format(
-            agentRec['AgentIP'], agentRec['AgentPort']), json=agentRec['devicesList'])
-        if r.status_code == 200:
-            print(
-                'Agent {} received device list'.format(agentRec['URL']))
-        else:
-            print('Error occured: {}'.format(r))
+
+    res = Parallel(n_jobs=len(agentRecords))(delayed(SendDevice)(agentRec) for agentRec in agentRecords)
+
+    #for i, agentRec in enumerate(agentRecords):
+    #    print(
+    #        'Send json file of devices to agent in url {}'.format(agentRec['URL']))
+    #    print('Request url: {}:{}'.format(
+    #        agentRec['AgentIP'], agentRec['AgentPort']))
+    #    print('Send devices: {}'.format(agentRec['devicesList']))
+    #
+    #    if res[i].status_code == 200:
+    #        print(
+    #            'Agent {} received device list'.format(agentRec['URL']))
+    #    else:
+    #        print('Error occured: {}'.format(r))
+        
 
 
 if __name__ == "__main__":

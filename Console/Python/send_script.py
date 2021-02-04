@@ -13,9 +13,13 @@ def SendScriptToAgent(agentRec: dict, scriptContent: str, delayBeforeStoppingSer
 
 
 def SendScriptToAgents(agentRecords: list, scriptContent: str, delayBeforeStoppingServer: int):
-    for agentRec in agentRecords:
-        if agentRec['IsReady']:
-            SendScriptToAgent(agentRec, scriptContent, delayBeforeStoppingServer)
+    from joblib import Parallel, delayed
+
+    res = Parallel(n_jobs=len(agentRecords))(delayed(SendScriptToAgent)(agentRec, scriptContent, delayBeforeStoppingServer) for agentRec in agentRecords)
+
+    #for agentRec in agentRecords:
+    #    if agentRec['IsReady']:
+    #        SendScriptToAgent(agentRec, scriptContent, delayBeforeStoppingServer)
 
 
 if __name__ == "__main__":
