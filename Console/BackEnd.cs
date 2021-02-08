@@ -2,7 +2,6 @@
 using Console.Models;
 using Console.Utilities;
 using Newtonsoft.Json;
-using Shared;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -14,11 +13,15 @@ using Amazon.ECS;
 using Amazon.Runtime;
 using System.Timers;
 using System.Threading;
-
+using Amazon.RDS;
+using Amazon.RDS.Model;
+using Console.Interfaces;
+using Event = Console.Models.Event;
+using Amazon;
 
 namespace Backend
 {
-    public class BackEnd : IBackEndInterfaces
+    public class BackEnd : IBackEndInterface
     {
         private static System.Timers.Timer _getAgentConnectTimer = null;
         private static System.Timers.Timer _getAWSResourcesTimer = new System.Timers.Timer(new TimeSpan(0, 1, 0).TotalMilliseconds);
@@ -486,6 +489,64 @@ namespace Backend
             }
         }
 
+        public async Task GetComparisonResults(string url, EventsLog eventsLog)
+        {
+
+            Utils.LoadConfig();
+
+            try
+            {
+                if (Settings.Get("MODE").ToLower() == "debug")
+                {
+                    url = url.Replace("127.0.0.1", "localhost").Replace("::1", "localhost");
+                }
+
+                var events = eventsLog.EventsJson;
+
+                var eventLogFileDir = Path.Combine(Settings.Get("DEVICE_RESULTS_DIR"), eventsLog.DeviceName);
+                var eventLogFilePath = Path.Combine(eventLogFileDir, "clientEventLog.csv");
+
+                if (!Directory.Exists(eventLogFileDir))
+                {
+                    Directory.CreateDirectory(eventLogFileDir);
+                }
+
+                Utils.WriteToFile(eventLogFilePath, events, false);
+
+                var sn = eventsLog.DeviceName.Split('_')[0];
+                var ga = eventsLog.DeviceName.Split('_')[1];
+
+                Utils.WriteLog($"-----GET COMPARE RESULTS FOR {eventsLog.DeviceName} BEGIN-----", "info");
+
+                int returnCode = Utils.RunCommand(Settings.Get("PYTHON"), "compare_events.py", $"{Settings.Get("CONFIG_FILE")} {sn} {ga} {eventLogFilePath}", Settings.Get("PYTHON_SCRIPTS_PATH"), Settings.Get("OUTPUT"));
+
+                if (returnCode == 0)
+                {
+                    Utils.WriteLog($"Comparison results were sent to test center.", "info");
+                }
+                else
+                {
+                    Utils.WriteLog($"Comparison results sending to test center failed.", "info");
+                }
+
+                if (Directory.GetFiles(eventLogFileDir).Length < 2)
+                {
+                    Directory.Delete(eventLogFileDir, recursive: true);
+                }
+
+                Utils.WriteLog($"-----GET COMPARE RESULTS FOR {eventsLog.DeviceName} END-----", "info");
+
+            }
+            catch (Exception ex)
+            {
+                Utils.WriteLog($"{ex.Message} {ex.StackTrace}", "error");
+            }
+            finally
+            {
+                Utils.WriteLog($"-----GET COMPARE RESULTS FOR {eventsLog.DeviceName} END-----", "info");
+            }
+        }
+
         /// <summary>
         /// Get from agent report of script log and write them to file <deviceName>_log.txt
         /// </summary>
@@ -774,7 +835,7 @@ namespace Backend
 
                 var client = new AmazonCloudWatchClient(
                      Settings.Get("AWSAccessKey"),
-                     Settings.Get("AWSSecretKey")
+                     Settings.Get("AWSSecretKey"), RegionEndpoint.USEast1
                      );
 
                 Utils.WriteLog("---------------------------------------------------------------", "info");

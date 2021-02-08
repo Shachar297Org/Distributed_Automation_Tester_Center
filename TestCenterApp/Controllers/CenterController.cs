@@ -1,9 +1,9 @@
 ﻿using Backend;
 using Console;
+using Console.Interfaces;
 using Console.Models;
 using Console.Utilities;
 using Newtonsoft.Json;
-using Shared;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -21,7 +21,7 @@ namespace TestCenterApp.Controllers
 {
     public class CenterController : ApiController
     {
-        IBackEndInterfaces backEnd;
+        IBackEndInterface backEnd;
 
         public CenterController()
         {
@@ -124,8 +124,32 @@ namespace TestCenterApp.Controllers
             HttpContent requestContent = Request.Content;
             try
             {
-                string jsonContent = requestContent.ReadAsStringAsync().Result;
+                string jsonContent = await requestContent.ReadAsStringAsync();
                 await backEnd.GetComparisonResults(agentIP, jsonContent);
+                string msg = "Comparison results were received";
+                var response = Request.CreateResponse(HttpStatusCode.OK);
+                response.Content = new StringContent(("{result:" + msg + "}"), Encoding.UTF8, "application/json");
+                return response;
+            }
+            catch (Exception)
+            {
+                string msg = "Comparison results were not received";
+                var response = Request.CreateResponse(HttpStatusCode.InternalServerError);
+                response.Content = new StringContent(("{result:" + msg + "}"), Encoding.UTF8, "application/json");
+                return response;
+            }
+        }
+
+        // POST: events
+        [HttpPost]
+        [Route("sendEventsLog")]
+        public async Task<HttpResponseMessage> SendEventsLog([FromBody] EventsLog eventsLog)
+        {
+            string agentIP = HttpContext.Current.Request.ServerVariables["REMOTE_ADDR"];
+            HttpContent requestContent = Request.Content;
+            try
+            {
+                await backEnd.GetComparisonResults(agentIP, eventsLog);
                 string msg = "Comparison results were received";
                 var response = Request.CreateResponse(HttpStatusCode.OK);
                 response.Content = new StringContent(("{result:" + msg + "}"), Encoding.UTF8, "application/json");

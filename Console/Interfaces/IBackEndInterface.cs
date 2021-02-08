@@ -4,10 +4,11 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Console.Models;
 
-namespace Shared
+namespace Console.Interfaces
 {
-    public interface IBackEndInterfaces
+    public interface IBackEndInterface
     {
         Task<bool> Connect(string url);
 
@@ -17,7 +18,7 @@ namespace Shared
 
         Task GetComparisonResults(string url, string jsonContent);
 
-        Task GetComparisonResults(string url, List<Console.Events> events);
+        Task GetComparisonResults(string url, EventsLog events);
 
         Task Init();
 

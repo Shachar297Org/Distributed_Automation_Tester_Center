@@ -294,10 +294,6 @@
       <Project>{c123f591-ea32-4ec3-b30f-0e423fa28fea}</Project>
       <Name>Console</Name>
     </ProjectReference>
-    <ProjectReference Include="..\Shared\Shared.csproj">
-      <Project>{8203eb85-2c12-4075-a8d4-390b860ebc43}</Project>
-      <Name>Shared</Name>
-    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <Analyzer Include="..\packages\AWSSDK.CloudWatch.3.5.0.58\analyzers\dotnet\cs\AWSSDK.CloudWatch.CodeAnalysis.dll" />

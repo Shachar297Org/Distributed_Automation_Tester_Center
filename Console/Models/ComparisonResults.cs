@@ -9,4 +9,10 @@ namespace Console.Models
         public string DeviceName { get; set; }
         public List<Event> Events { get; set; }
     }
+
+    public class EventsLog
+    {
+        public string DeviceName { get; set; }
+        public string EventsJson { get; set; }
+    }
 }

@@ -17,10 +17,6 @@ def SendScriptToAgents(agentRecords: list, scriptContent: str, delayBeforeStoppi
 
     res = Parallel(n_jobs=len(agentRecords))(delayed(SendScriptToAgent)(agentRec, scriptContent, delayBeforeStoppingServer) for agentRec in agentRecords)
 
-    #for agentRec in agentRecords:
-    #    if agentRec['IsReady']:
-    #        SendScriptToAgent(agentRec, scriptContent, delayBeforeStoppingServer)
-
 
 if __name__ == "__main__":
     from activate_env import *
