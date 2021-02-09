@@ -143,7 +143,7 @@ namespace Backend
 
                 var awsEcsClient = new AmazonECSClient(
                     Settings.Get("AWSAccessKey"),
-                    Settings.Get("AWSSecretKey"));
+                    Settings.Get("AWSSecretKey"), Amazon.RegionEndpoint.USEast1);
 
                 var clusterName = $"{Settings.Get("ENV").ToLower()}-ECS-Cluster";
 
@@ -195,7 +195,7 @@ namespace Backend
 
                 var awsEcsClient = new AmazonECSClient(
                     Settings.Get("AWSAccessKey"),
-                    Settings.Get("AWSSecretKey"));
+                    Settings.Get("AWSSecretKey"), Amazon.RegionEndpoint.USEast1);
 
                 var listTasksRequest = new Amazon.ECS.Model.ListTasksRequest();
                 listTasksRequest.Cluster = clusterName;
@@ -591,7 +591,7 @@ namespace Backend
             {
                 Utils.WriteLog($"-----DISTRIBUTE STAGE BEGIN-----", "info");
                 int returnCode = Utils.RunCommand(Settings.Get("PYTHON"), "distribute_devices.py", $"{Settings.Get("CONFIG_FILE")}", Settings.Get("PYTHON_SCRIPTS_PATH"), Settings.Get("OUTPUT"));
-                Utils.WriteToFile(Settings.Get("RETURN_CODE"), returnCode.ToString(), false);
+                
             }
             catch (Exception ex)
             {
@@ -623,7 +623,7 @@ namespace Backend
                 string pythonExePath = Settings.Get("PYTHON");
                 Utils.WriteLog($"Python exe path: {pythonExePath}", "info");
                 int returnCode = Utils.RunCommand(pythonExePath, "delete_device.py", $"{deviceSerialNumber} {deviceType} {configFile} {dataType} {fromDateStr} {toDateStr}", pythonScriptsFolder, Settings.Get("OUTPUT"));
-                Utils.WriteToFile(Settings.Get("RETURN_CODE"), returnCode.ToString(), false);
+                
             }
             catch (Exception ex)
             {
@@ -646,7 +646,7 @@ namespace Backend
                 string pythonExePath = Settings.Get("PYTHON");
                 Utils.WriteLog($"Python exe path: {pythonExePath}", "info");
                 int returnCode = Utils.RunCommand(pythonExePath, "delete_device.py", $"{deviceSerialNumber} {deviceType} {configFile}", pythonScriptsFolder, Settings.Get("OUTPUT"));
-                Utils.WriteToFile(Settings.Get("RETURN_CODE"), returnCode.ToString(), false);
+                
             }
             catch (Exception ex)
             {
@@ -665,7 +665,7 @@ namespace Backend
                 Utils.WriteLog("-----SEND SCRIPT STAGE BEGIN-----", "info");
                 Utils.WriteLog("Send automation script to agents.", "info");
                 int returnCode = Utils.RunCommand(Settings.Get("PYTHON"), "send_script.py", $"{Settings.Get("CONFIG_FILE")}", Settings.Get("PYTHON_SCRIPTS_PATH"), Settings.Get("OUTPUT"));
-                Utils.WriteToFile(Settings.Get("RETURN_CODE"), returnCode.ToString(), false);
+                
             }
             catch (Exception ex)
             {
@@ -695,7 +695,7 @@ namespace Backend
         {
             Utils.WriteLog("Collect AWS instances.", "info");
             int returnCode = Utils.RunCommand(Settings.Get("PYTHON"), "collect_aws_instances.py", $"{Settings.Get("AWS_INSTANCES_PATH")}", Settings.Get("PYTHON_SCRIPTS_PATH"), Settings.Get("OUTPUT"));
-            Utils.WriteToFile(Settings.Get("RETURN_CODE"), returnCode.ToString(), false);
+            
         }
 
         private void GetAWSMetrics()
@@ -707,7 +707,7 @@ namespace Backend
 
                 var client = new AmazonCloudWatchClient(
                      Settings.Get("AWSAccessKey"),
-                     Settings.Get("AWSSecretKey")
+                     Settings.Get("AWSSecretKey"), Amazon.RegionEndpoint.USEast1
                      );
 
 
@@ -774,7 +774,7 @@ namespace Backend
 
                 var client = new AmazonCloudWatchClient(
                      Settings.Get("AWSAccessKey"),
-                     Settings.Get("AWSSecretKey")
+                     Settings.Get("AWSSecretKey"), Amazon.RegionEndpoint.USEast1
                      );
 
                 Utils.WriteLog("---------------------------------------------------------------", "info");
