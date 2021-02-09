@@ -146,7 +146,7 @@ namespace Backend
 
                 var awsEcsClient = new AmazonECSClient(
                     Settings.Get("AWSAccessKey"),
-                    Settings.Get("AWSSecretKey"));
+                    Settings.Get("AWSSecretKey"), RegionEndpoint.USEast1);
 
                 var clusterName = $"{Settings.Get("ENV").ToLower()}-ECS-Cluster";
 
@@ -198,7 +198,7 @@ namespace Backend
 
                 var awsEcsClient = new AmazonECSClient(
                     Settings.Get("AWSAccessKey"),
-                    Settings.Get("AWSSecretKey"));
+                    Settings.Get("AWSSecretKey"), RegionEndpoint.USEast1);
 
                 var listTasksRequest = new Amazon.ECS.Model.ListTasksRequest();
                 listTasksRequest.Cluster = clusterName;
@@ -522,11 +522,11 @@ namespace Backend
 
                 if (returnCode == 0)
                 {
-                    Utils.WriteLog($"Comparison results were sent to test center.", "info");
+                    Utils.WriteLog($"Comparison results were received by test center.", "info");
                 }
                 else
                 {
-                    Utils.WriteLog($"Comparison results sending to test center failed.", "info");
+                    Utils.WriteLog($"Test center failed to receive comparison results", "info");
                 }
 
                 if (Directory.GetFiles(eventLogFileDir).Length < 2)
@@ -768,7 +768,8 @@ namespace Backend
 
                 var client = new AmazonCloudWatchClient(
                      Settings.Get("AWSAccessKey"),
-                     Settings.Get("AWSSecretKey")
+                     Settings.Get("AWSSecretKey"),
+                     RegionEndpoint.USEast1
                      );
 
 
