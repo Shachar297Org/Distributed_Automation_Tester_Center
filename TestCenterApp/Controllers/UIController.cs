@@ -6,7 +6,7 @@ using System.Web.Mvc;
 
 namespace TestCenterApp.Controllers
 {
-    public class HomeController : Controller
+    public class UIController : Controller
     {
         public ActionResult Index()
         {
