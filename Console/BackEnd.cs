@@ -1,4 +1,5 @@
 ﻿using Console;
+using TestCenterConsole.Models;
 using Console.Models;
 using Console.Utilities;
 using Newtonsoft.Json;
@@ -18,20 +19,22 @@ using Amazon.RDS.Model;
 using Console.Interfaces;
 using Event = Console.Models.Event;
 using Amazon;
+using System.Net.Http;
+using System.Text;
+using Newtonsoft.Json.Linq;
+using System.Net.Http.Headers;
 
-namespace Backend
+namespace Console
 {
     public class BackEnd : IBackEndInterface
     {
         private static System.Timers.Timer _getAgentConnectTimer = null;
-        private static System.Timers.Timer _getAWSResourcesTimer = new System.Timers.Timer(new TimeSpan(0, 1, 0).TotalMilliseconds);
-
+        private static System.Timers.Timer _getAWSResourcesTimer = new System.Timers.Timer(new TimeSpan(0, 2, 0).TotalMilliseconds);
         private static System.Timers.Timer _stopECSTaskTimer = new System.Timers.Timer(new TimeSpan(0, 1, 0).TotalMilliseconds);
 
-
         private static List<Agent> _agents = new List<Agent>();
+       
         private static HashSet<LumenisXDevice> _devices = new HashSet<LumenisXDevice>();
-        private static Dictionary<string, double> _cpuUtilization = new Dictionary<string, double>();
 
         private static List<string> _servicesToStop = new List<string>();
 
@@ -39,18 +42,71 @@ namespace Backend
 
         private static double _stoppedMinutes = 0;
 
-        enum DeviceData
+        private static Settings Settings;
+
+        public event EventHandler<AwsMetricsData> AwsDataUpdated;
+        public event EventHandler<StageData> StageDataUpdated;
+
+        IHttpClientFactory _clientFactory;
+
+        public BackEnd(Settings settings, IHttpClientFactory clientFactory)
         {
-            commands,
-            events
+            Settings = settings;
+            _clientFactory = clientFactory;
         }
 
-        enum InsertionStrategy
+        public void UpdateCenterSettings(TestCenterSettings settings)
         {
-            intersect,
-            all_new,
-            union
+            Settings["ENV"] = settings.Environment.ToString().ToLower();
+            Settings["LOG_FILE_PATH"] = !string.IsNullOrWhiteSpace(settings.LogFilePath) ? settings.LogFilePath : Settings["LOG_FILE_PATH"];
+            Settings["DEVICE_LOGS_DIR"] = !string.IsNullOrWhiteSpace(settings.ScriptResultsFolder) ? settings.ScriptResultsFolder : Settings["DEVICE_LOGS_DIR"];
+            Settings["DEVICE_RESULTS_DIR"] = !string.IsNullOrWhiteSpace(settings.ResultsFolder) ? settings.ResultsFolder : Settings["DEVICE_RESULTS_DIR"];
         }
+
+        public void UpdateScenarioSettings(Scenario scenario)
+        {
+            //if (Settings["SCENARIO_DEVICE_NUMBER"] != scenario.DevicesNumber.ToString() ||
+            //        Settings["SCENARIO_DEVICE_TYPE"] != scenario.DevicesType)
+            {
+                List<LumenisXDevice> devices = new List<LumenisXDevice>();
+                for (int i = 1; i <= scenario.DevicesNumber; i++)
+                {
+                    var device = new LumenisXDevice(scenario.DevicesType, $"{scenario.Name}-{i}");
+                    devices.Add(device);
+                }
+
+                Utils.WriteDevicesToCsv(Settings["DEVICES_PATH"], devices);
+            }
+            
+
+            Settings["SCENARIO_DEVICE_NUMBER"] = scenario.DevicesNumber.ToString();
+            Settings["SCENARIO_DEVICE_TYPE"] = scenario.DevicesType;
+            Settings["SCENARIO_INSERTION_STRATEGY"] = scenario.InsertionStrategy.ToString().ToLower();
+
+            Settings["SCENARIO_STOP_AWS"] = scenario.StopAws.ToString();
+
+            Settings["SCENARIO_MINUTES_TO_KEEP_STOPPED"] = scenario.MinutesServicesStopped.ToString();
+            Settings["SCENARIO_MINUTES_TO_CONNECT"] = scenario.MinutesToWaitForAgents.ToString();
+            Settings["SCENARIO_SERVICES_TO_STOP"] = string.Join(",", scenario.Services.Select(s => s.ToString()).ToList());
+
+            Settings["SCENARIO_NAME"] = scenario.Name;
+            
+        }
+
+
+        private void TriggerAwsDataUpdate(AwsMetricsData data)
+        {
+            // call all subscribers
+            if (AwsDataUpdated != null) // make sure there are subscribers!
+                AwsDataUpdated(this, data); // trigger the event
+        }
+
+        private void TriggerStageDataUpdate(StageData data)
+        {
+            // call all subscribers
+            if (StageDataUpdated != null) // make sure there are subscribers!
+                StageDataUpdated(this, data); // trigger the event
+        }      
 
 
         /// <summary>
@@ -62,47 +118,36 @@ namespace Backend
         /// </summary>
         public async Task Init()
         {
-            Utils.LoadConfig();
+            //Utils.LoadConfig();
             try
             {
                 Utils.WriteLog($"-----INIT STAGE BEGIN-----", "info");
 
-                int minutesToConnect = int.Parse(Settings.Get("MINUTES_TO_CONNECT"));
+                int minutesToConnect = int.Parse(Settings["SCENARIO_MINUTES_TO_CONNECT"]);
                 _getAgentConnectTimer = new System.Timers.Timer(new TimeSpan(0, minutesToConnect, 0).TotalMilliseconds);
 
                 _getAgentConnectTimer.Elapsed += GetAgentConnectTimer_Elapsed;
                 _getAWSResourcesTimer.Elapsed += GetAWSResourcesTimer_Elapsed;
 
-
                 _stopECSTaskTimer.Elapsed += StopECSTimer_Elapsed;
                 _stopECSTaskTimer.AutoReset = false;
                 _getAgentConnectTimer.AutoReset = false;
 
-                var devicesLogsFolder = Settings.Get("DEVICE_LOGS_DIR");
-                if (Directory.Exists(devicesLogsFolder))
-                {
-                    CleanUpFolderContent(devicesLogsFolder);
-                }
-                
-                var devicesResultsFolder = Settings.Get("DEVICE_RESULTS_DIR");
-                if (Directory.Exists(devicesResultsFolder))
-                {
-                    CleanUpFolderContent(devicesResultsFolder);
-                }
+                PrepareCenter();
 
                 DevicesFromCsv();
 
-                _servicesToStop = Settings.Get("SERVICES_TO_STOP").Split(',').ToList();
+                _servicesToStop = Settings["SCENARIO_SERVICES_TO_STOP"].Split(',').ToList();
 
                 try
                 {
-                    var skipInsert = bool.Parse(Settings.Get("SKIP_INSERT_FROM_API"));
+                    var skipInsert = bool.Parse(Settings["SCENARIO_SKIP_INSERT_FROM_API"]);
 
                     if (!skipInsert)
                     {
-                        var mode = (InsertionStrategy)int.Parse(Settings.Get("INSERTION_STRATEGY"));
+                        var mode = Enum.Parse(typeof(InsertionStrategy), Settings["SCENARIO_INSERTION_STRATEGY"]);
 
-                        InsertDevicesToPortal(Settings.Get("CONFIG_FILE"), mode);
+                        InsertDevicesToPortal(Settings["CONFIG_FILE"], (InsertionStrategy)mode);
 
                     }
                     else
@@ -123,10 +168,7 @@ namespace Backend
 
                 // Measure services
                 GetAWSECSMetrics();
-
-                //InsertDevicesToPortal(Settings.Get("ENV"), Settings.Get("DEVICES_PATH"));
-                //CollectAWSServices(Settings.Get("ENV"));
-                //CollectAWSInstances();                
+           
             }
             catch (Exception ex)
             {
@@ -135,6 +177,12 @@ namespace Backend
             finally
             {
                 Utils.WriteLog($"-----INIT STAGE END-----", "info");
+
+                var stageData = new StageData();
+                stageData.Stage = Stage.AGENTS_CONNECT.ToString();
+                stageData.StageIdx = Stage.AGENTS_CONNECT;
+                stageData.Time = DateTime.Now;
+                TriggerStageDataUpdate(stageData);
             }
         }
 
@@ -145,13 +193,13 @@ namespace Backend
                 Utils.WriteLog("============================================================", "info");
 
                 var awsEcsClient = new AmazonECSClient(
-                    Settings.Get("AWSAccessKey"),
-                    Settings.Get("AWSSecretKey"), RegionEndpoint.USEast1);
+                    Settings["AWSAccessKey"],
+                    Settings["AWSSecretKey"], RegionEndpoint.USEast1);
 
-                var clusterName = $"{Settings.Get("ENV").ToLower()}-ECS-Cluster";
+                var clusterName = $"{Settings["ENV"].ToLower()}-ECS-Cluster";
 
                 var describeServiceRequest = new Amazon.ECS.Model.DescribeServicesRequest();
-                describeServiceRequest.Services = _servicesToStop.Select(s => $"{Settings.Get("ENV").ToLower()}-{s}-Service").ToList();
+                describeServiceRequest.Services = _servicesToStop.Select(s => $"{Settings["ENV"].ToLower()}-{s}-Service").ToList();
                 describeServiceRequest.Cluster = clusterName;
 
                 var describeServiceResponse = awsEcsClient.DescribeServicesAsync(describeServiceRequest);
@@ -177,7 +225,7 @@ namespace Backend
             finally
             {
                 Utils.WriteLog("============================================================", "info");
-                var minutesToKeepStopped = int.Parse(Settings.Get("MINUTES_TO_KEEP_STOPPED"));
+                var minutesToKeepStopped = int.Parse(Settings["SCENARIO_MINUTES_TO_KEEP_STOPPED"]);
                 if (_stoppedMinutes <= minutesToKeepStopped)
                 {
                     _stopECSTaskTimer.Interval = new TimeSpan(0, 0, 30).TotalMilliseconds;
@@ -194,11 +242,11 @@ namespace Backend
             {
                 Utils.WriteLog($"Stopping ALL tasks for service {serviceWhereStopTasks}", "info");
 
-                var clusterName = $"{Settings.Get("ENV").ToLower()}-ECS-Cluster";
+                var clusterName = $"{Settings["ENV"].ToLower()}-ECS-Cluster";
 
                 var awsEcsClient = new AmazonECSClient(
-                    Settings.Get("AWSAccessKey"),
-                    Settings.Get("AWSSecretKey"), RegionEndpoint.USEast1);
+                    Settings["AWSAccessKey"],
+                    Settings["AWSSecretKey"], RegionEndpoint.USEast1);
 
                 var listTasksRequest = new Amazon.ECS.Model.ListTasksRequest();
                 listTasksRequest.Cluster = clusterName;
@@ -268,7 +316,7 @@ namespace Backend
 
         private void DevicesFromCsv()
         {
-            var fileName = Settings.Get("DEVICES_PATH");
+            var fileName = Settings["DEVICES_PATH"];
             var lines = File.ReadAllLines(fileName).Skip(1).Select(a => a.Split(','));
             var devices = from line in lines
                       select new LumenisXDevice(line[0], line[1]);
@@ -287,7 +335,14 @@ namespace Backend
         private void GetAgentConnectTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
         {  
             Utils.WriteLog($"*****Connect timer stop*****", "info");
-            Utils.WriteAgentListToFile(_agents, Settings.Get("AGENTS_PATH"));
+            Utils.WriteAgentListToFile(_agents, Settings["AGENTS_PATH"]);
+
+            var stageData = new StageData();
+            stageData.Stage = Stage.DISTRIBUTE_DEVICES.ToString();
+            stageData.StageIdx = Stage.DISTRIBUTE_DEVICES;
+            stageData.Time = DateTime.Now;
+            TriggerStageDataUpdate(stageData);
+            
             DistributeDevicesAmongAgents();
         }
 
@@ -296,7 +351,7 @@ namespace Backend
         /// </summary>
         private void StartSendingScript()
         { 
-            Utils.WriteAgentListToFile(_agents, Settings.Get("AGENTS_PATH"));
+            Utils.WriteAgentListToFile(_agents, Settings["AGENTS_PATH"]);
 
             Utils.WriteLog($"Starting AWS resources timer", "info");
             _getAWSResourcesTimer.Start();
@@ -315,24 +370,29 @@ namespace Backend
 
             try
             {
-                Utils.LoadConfig();
-
+                var stageData = new StageData();
+                stageData.Stage = Stage.INIT.ToString();
+                stageData.StageIdx = Stage.INIT;
+                stageData.Time = DateTime.Now;
+                TriggerStageDataUpdate(stageData);
+                
                 Utils.WriteLog($"-----CONNECT STAGE BEGIN-----", "info");
-                string agentsPath = Settings.Get("AGENTS_PATH");
+                string agentsPath = Settings["AGENTS_PATH"];
                 Utils.WriteLog($"Received agent connect from {agentUrl}.", "info");
-                string agentsFilePath = Settings.Get("AGENTS_PATH");
+                string agentsFilePath = Settings["AGENTS_PATH"];
 
                 Utils.WriteLog($"Agent {agentUrl} is connecting...", "info");   
 
                 Utils.WriteLog($"Agent {agentUrl}: entering critical code...", "info");
 
                 Utils.WriteLog($"Current agents number: {_agents.Count}.", "info");
+
                 if (_agents.Count == 0)
                 {
                     await Init();
                 }
 
-                if (Settings.Get("MODE").ToLower() == "debug")
+                if (Settings["MODE"].ToLower() == "debug")
                 {
                     agentUrl = agentUrl.Replace("127.0.0.1", "localhost").Replace("::1", "localhost");
                 }
@@ -343,13 +403,14 @@ namespace Backend
                     Utils.WriteLog($"Agent {agentUrl} already exists.", "info");
                 }
                 else
-                {       
+                {
                     string[] urlStrings = agentUrl.Split(':');
                     Utils.WriteLog($"Adding agent {agentUrl} to pool.", "info");
                     _agents.Add(new Agent(urlStrings[0], int.Parse(urlStrings[1]), false));
                     Utils.WriteLog($"Agents count: {_agents.Count}.", "info");
-                    //Utils.WriteAgentListToFile(_agents, agentsFilePath);
+                    
                 }
+
                 Utils.WriteLog($"Agent {agentUrl}: exiting critical code...", "info");
 
                 Utils.WriteLog($"Agent {agentUrl} was connected successfully.", "info");
@@ -377,38 +438,39 @@ namespace Backend
 
              try
              {
-                Utils.LoadConfig();
-                string agentsFilePath = Settings.Get("AGENTS_PATH");
+                string agentsFilePath = Settings["AGENTS_PATH"];
 
-                if (Settings.Get("MODE").ToLower() == "debug")
-                 {
-                     url = url.Replace("127.0.0.1", "localhost").Replace("::1", "localhost");
-                 }
+                if (Settings["MODE"].ToLower() == "debug")
+                {
+                    url = url.Replace("127.0.0.1", "localhost").Replace("::1", "localhost");
+                }
 
-                 Utils.WriteLog($"Received agent ready from {url}.", "info");
+                Utils.WriteLog($"Received agent ready from {url}.", "info");
 
-                 Agent agent = _agents.Find(a => a.URL == url);
-                 if (agent == null)
-                 {
-                     Utils.WriteLog($"Agent {url} does not exist", "error");
-                 }
-                 agent.IsReady = true;
+                Agent agent = _agents.Find(a => a.URL == url);
+                if (agent == null)
+                {
+                    Utils.WriteLog($"Agent {url} does not exist", "error");
+                    return false;
+                }
+                
+                agent.IsReady = true;
 
-                 bool allAgentsAreReady = _agents.All(a => a.IsReady);
+                bool allAgentsAreReady = _agents.All(a => a.IsReady);
 
-                 if (allAgentsAreReady)
-                 {
-                    StartSendingScript();
-                    var scenario = int.Parse(Settings.Get("SCENARIO"));
+                if (allAgentsAreReady)
+                {
+                   StartSendingScript();
+                   var stopAWSServices = bool.Parse(Settings["SCENARIO_STOP_AWS"]);
 
-                    if (scenario == 2)
-                    {            
+                   if (stopAWSServices)
+                   {            
 
-                        _stopECSTaskTimer.Start();
-                    }
-                 }
-                 
-                 return true;
+                       _stopECSTaskTimer.Start();
+                   }
+                }
+                
+                return true;
              }
              catch (Exception ex)
              {
@@ -421,11 +483,9 @@ namespace Backend
         public async Task GetComparisonResults(string url, string jsonContent)
         {
 
-            Utils.LoadConfig();
-
             try
             {
-                if (Settings.Get("MODE").ToLower() == "debug")
+                if (Settings["MODE"].ToLower() == "debug")
                 {
                     url = url.Replace("127.0.0.1", "localhost").Replace("::1", "localhost");
                 }
@@ -435,7 +495,7 @@ namespace Backend
 
                 Utils.WriteLog($"-----GET COMPARE RESULTS FOR {comparisonResults.DeviceName} BEGIN-----", "info");
 
-                string deviceResultsDir = Settings.Get("DEVICE_RESULTS_DIR");
+                string deviceResultsDir = Settings["DEVICE_RESULTS_DIR"];
                 if (!Directory.Exists(deviceResultsDir))
                 {
                     Directory.CreateDirectory(deviceResultsDir);
@@ -472,7 +532,7 @@ namespace Backend
                     string jsonContentByDevice = JsonConvert.SerializeObject(deviceResultsDict[deviceName]);
                     string csvFileByDevice = Path.Combine(deviceResultsDir, deviceName, deviceName + ".csv");
                     //Utils.WriteToFile(jsonFileByDevice, jsonContentByDevice, append: false);
-                    Utils.WriteRecordsToCsv(csvFileByDevice, deviceResultsDict[deviceName]);
+                    Utils.WriteEventsToCsv(csvFileByDevice, deviceResultsDict[deviceName]);
                 }
                 Utils.WriteLog($"Comparison files was received from agent {url}", "info");
 
@@ -492,18 +552,23 @@ namespace Backend
         public async Task GetComparisonResults(string url, EventsLog eventsLog)
         {
 
-            Utils.LoadConfig();
-
             try
             {
-                if (Settings.Get("MODE").ToLower() == "debug")
+
+                var stageData = new StageData();
+                stageData.Stage = Stage.GET_RESULTS.ToString();
+                stageData.StageIdx = Stage.GET_RESULTS;
+                stageData.Time = DateTime.Now;
+                TriggerStageDataUpdate(stageData);
+
+                if (Settings["MODE"].ToLower() == "debug")
                 {
                     url = url.Replace("127.0.0.1", "localhost").Replace("::1", "localhost");
                 }
 
                 var events = eventsLog.EventsJson;
 
-                var eventLogFileDir = Path.Combine(Settings.Get("DEVICE_RESULTS_DIR"), eventsLog.DeviceName);
+                var eventLogFileDir = Path.Combine(Settings["DEVICE_RESULTS_DIR"], eventsLog.DeviceName);
                 var eventLogFilePath = Path.Combine(eventLogFileDir, "clientEventLog.csv");
 
                 if (!Directory.Exists(eventLogFileDir))
@@ -518,7 +583,7 @@ namespace Backend
 
                 Utils.WriteLog($"-----GET COMPARE RESULTS FOR {eventsLog.DeviceName} BEGIN-----", "info");
 
-                int returnCode = Utils.RunCommand(Settings.Get("PYTHON"), "compare_events.py", $"{Settings.Get("CONFIG_FILE")} {sn} {ga} {eventLogFilePath}", Settings.Get("PYTHON_SCRIPTS_PATH"), Settings.Get("OUTPUT"));
+                int returnCode = Utils.RunCommand(Settings["PYTHON"], "compare_events.py", $"{Settings["CONFIG_FILE"]} {sn} {ga} {eventLogFilePath}", Settings["PYTHON_SCRIPTS_PATH"], Settings["OUTPUT"]);
 
                 if (returnCode == 0)
                 {
@@ -534,8 +599,11 @@ namespace Backend
                     Directory.Delete(eventLogFileDir, recursive: true);
                 }
 
-                Utils.WriteLog($"-----GET COMPARE RESULTS FOR {eventsLog.DeviceName} END-----", "info");
+                _devices.Where(d => d.DeviceType == ga && d.DeviceSerialNumber == sn).FirstOrDefault().Finished = true;
 
+                var stData = new StageData();
+                stData.DevicesNumberFinished = _devices.Where(d => d.Finished == true).Count();
+                TriggerStageDataUpdate(stData);
             }
             catch (Exception ex)
             {
@@ -544,6 +612,19 @@ namespace Backend
             finally
             {
                 Utils.WriteLog($"-----GET COMPARE RESULTS FOR {eventsLog.DeviceName} END-----", "info");
+
+                if (_devices.Where(d => d.Finished == false).Count() == 0)
+                {
+                    _getAWSResourcesTimer.Stop();
+                    Utils.WriteLog($"Stopping AWS resources timer", "info");
+
+                    var stageData = new StageData();
+                    stageData.Stage = Stage.FINISHED.ToString();
+                    stageData.StageIdx = Stage.FINISHED;
+                    stageData.Time = DateTime.Now;
+                    stageData.DevicesNumberFinished = _devices.Count;
+                    TriggerStageDataUpdate(stageData);
+                }
             }
         }
 
@@ -555,17 +636,16 @@ namespace Backend
         /// <returns>true/false if operation succeeds</returns>
         public async Task GetScriptLog(string url, string jsonContent)
         {
-            Utils.LoadConfig();
-
+            
             try
-            {              
-
-                if (Settings.Get("MODE").ToLower() == "debug")
+            {
+                
+                if (Settings["MODE"].ToLower() == "debug")
                 {
                     url = url.Replace("127.0.0.1", "localhost").Replace("::1", "localhost");
                 }
 
-                string deviceLogsDir = Settings.Get("DEVICE_LOGS_DIR");
+                string deviceLogsDir = Settings["DEVICE_LOGS_DIR"];
                 if (!Directory.Exists(deviceLogsDir))
                 {
                     Directory.CreateDirectory(deviceLogsDir);
@@ -586,8 +666,7 @@ namespace Backend
 
                 var deviceType = deviceName.Split('_')[1];
                 var deviceSerialNumber = deviceName.Split('_')[0];
-
-                _devices.RemoveWhere(d => d.DeviceType == deviceType && d.DeviceSerialNumber == deviceSerialNumber);
+                
             }
             catch (Exception ex)
             {
@@ -595,11 +674,7 @@ namespace Backend
             }
             finally
             {
-                if (_devices.Count == 0)
-                {
-                    _getAWSResourcesTimer.Stop();
-                    Utils.WriteLog($"Stopping AWS resources timer", "info");
-                }
+ 
             }
         }
 
@@ -622,10 +697,10 @@ namespace Backend
             {
 
                 Utils.WriteLog("-----INSERT DEVICES BEGIN----.", "info");
-                string pythonScriptsFolder = Settings.Get("PYTHON_SCRIPTS_PATH");
-                string pythonExePath = Settings.Get("PYTHON");
+                string pythonScriptsFolder = Settings["PYTHON_SCRIPTS_PATH"];
+                string pythonExePath = Settings["PYTHON"];
                 Utils.WriteLog($"Python exe path: {pythonExePath}", "info");
-                var result = Utils.RunCommand(pythonExePath, "insert_devices.py", $"{configFile} {strategy}", pythonScriptsFolder, Settings.Get("OUTPUT"));
+                var result = Utils.RunCommand(pythonExePath, "insert_devices.py", $"{configFile} {strategy}", pythonScriptsFolder, Settings["OUTPUT"]);
 
                 var resultStr = result==1 ? "not completed" : "completed";
                 Utils.WriteLog($"Insertion has {resultStr} successfully", "info");
@@ -651,8 +726,8 @@ namespace Backend
             try
             {
                 Utils.WriteLog($"-----DISTRIBUTE STAGE BEGIN-----", "info");
-                int returnCode = Utils.RunCommand(Settings.Get("PYTHON"), "distribute_devices.py", $"{Settings.Get("CONFIG_FILE")}", Settings.Get("PYTHON_SCRIPTS_PATH"), Settings.Get("OUTPUT"));
-                Utils.WriteToFile(Settings.Get("RETURN_CODE"), returnCode.ToString(), false);
+                int returnCode = Utils.RunCommand(Settings["PYTHON"], "distribute_devices.py", $"{Settings["CONFIG_FILE"]}", Settings["PYTHON_SCRIPTS_PATH"], Settings["OUTPUT"]);
+                
             }
             catch (Exception ex)
             {
@@ -661,6 +736,7 @@ namespace Backend
             finally
             {
                 Utils.WriteLog($"-----DISTRIBUTE STAGE END-----", "info");
+
             }
         }
 
@@ -680,11 +756,11 @@ namespace Backend
                 if (!string.IsNullOrEmpty(fromDateStr) && !string.IsNullOrEmpty(toDateStr)) 
                     Utils.WriteLog($"From date {fromDate} to date {toDate}", "info");
 
-                string pythonScriptsFolder = Settings.Get("PYTHON_SCRIPTS_PATH");
-                string pythonExePath = Settings.Get("PYTHON");
+                string pythonScriptsFolder = Settings["PYTHON_SCRIPTS_PATH"];
+                string pythonExePath = Settings["PYTHON"];
                 Utils.WriteLog($"Python exe path: {pythonExePath}", "info");
-                int returnCode = Utils.RunCommand(pythonExePath, "delete_device.py", $"{deviceSerialNumber} {deviceType} {configFile} {dataType} {fromDateStr} {toDateStr}", pythonScriptsFolder, Settings.Get("OUTPUT"));
-                Utils.WriteToFile(Settings.Get("RETURN_CODE"), returnCode.ToString(), false);
+                int returnCode = Utils.RunCommand(pythonExePath, "delete_device.py", $"{deviceSerialNumber} {deviceType} {configFile} {dataType} {fromDateStr} {toDateStr}", pythonScriptsFolder, Settings["OUTPUT"]);
+                
             }
             catch (Exception ex)
             {
@@ -703,11 +779,11 @@ namespace Backend
             {
                 Utils.WriteLog($"Deleting device from portal.", "info");
                 
-                string pythonScriptsFolder = Settings.Get("PYTHON_SCRIPTS_PATH");
-                string pythonExePath = Settings.Get("PYTHON");
+                string pythonScriptsFolder = Settings["PYTHON_SCRIPTS_PATH"];
+                string pythonExePath = Settings["PYTHON"];
                 Utils.WriteLog($"Python exe path: {pythonExePath}", "info");
-                int returnCode = Utils.RunCommand(pythonExePath, "delete_device.py", $"{deviceSerialNumber} {deviceType} {configFile}", pythonScriptsFolder, Settings.Get("OUTPUT"));
-                Utils.WriteToFile(Settings.Get("RETURN_CODE"), returnCode.ToString(), false);
+                int returnCode = Utils.RunCommand(pythonExePath, "delete_device.py", $"{deviceSerialNumber} {deviceType} {configFile}", pythonScriptsFolder, Settings["OUTPUT"]);
+                
             }
             catch (Exception ex)
             {
@@ -725,8 +801,8 @@ namespace Backend
             {
                 Utils.WriteLog("-----SEND SCRIPT STAGE BEGIN-----", "info");
                 Utils.WriteLog("Send automation script to agents.", "info");
-                int returnCode = Utils.RunCommand(Settings.Get("PYTHON"), "send_script.py", $"{Settings.Get("CONFIG_FILE")}", Settings.Get("PYTHON_SCRIPTS_PATH"), Settings.Get("OUTPUT"));
-                Utils.WriteToFile(Settings.Get("RETURN_CODE"), returnCode.ToString(), false);
+                int returnCode = Utils.RunCommand(Settings["PYTHON"], "send_script.py", $"{Settings["CONFIG_FILE"]}", Settings["PYTHON_SCRIPTS_PATH"], Settings["OUTPUT"]);
+                
             }
             catch (Exception ex)
             {
@@ -735,6 +811,11 @@ namespace Backend
             finally
             {
                 Utils.WriteLog("-----SEND SCRIPT STAGE END-----", "info");
+                var stageData = new StageData();
+                stageData.Stage = Stage.RUN_DEVICES.ToString();
+                stageData.StageIdx = Stage.RUN_DEVICES;
+                stageData.Time = DateTime.Now;
+                TriggerStageDataUpdate(stageData);
             }
         }
 
@@ -746,7 +827,7 @@ namespace Backend
         {
             Utils.WriteLog("Collect AWS services.", "info");
             string cwd = Directory.GetCurrentDirectory();
-            Utils.RunCommand("aws", "ecs", $"list-services --cluster {env}-ECS-Cluster", cwd, Settings.Get("AWS_SERVICES_PATH"));
+            Utils.RunCommand("aws", "ecs", $"list-services --cluster {env}-ECS-Cluster", cwd, Settings["AWS_SERVICES_PATH"]);
         }
 
         /// <summary>
@@ -755,8 +836,8 @@ namespace Backend
         private void CollectAWSInstances()
         {
             Utils.WriteLog("Collect AWS instances.", "info");
-            int returnCode = Utils.RunCommand(Settings.Get("PYTHON"), "collect_aws_instances.py", $"{Settings.Get("AWS_INSTANCES_PATH")}", Settings.Get("PYTHON_SCRIPTS_PATH"), Settings.Get("OUTPUT"));
-            Utils.WriteToFile(Settings.Get("RETURN_CODE"), returnCode.ToString(), false);
+            int returnCode = Utils.RunCommand(Settings["PYTHON"], "collect_aws_instances.py", $"{Settings["AWS_INSTANCES_PATH"]}", Settings["PYTHON_SCRIPTS_PATH"], Settings["OUTPUT"]);
+            
         }
 
         private void GetAWSMetrics()
@@ -764,11 +845,11 @@ namespace Backend
 
             try
             {
-                var instanceIds = Settings.Get("AWS_EC2_INSTANCES").Split(',');
+                var instanceIds = Settings["AWS_EC2_INSTANCES"].Split(',');
 
                 var client = new AmazonCloudWatchClient(
-                     Settings.Get("AWSAccessKey"),
-                     Settings.Get("AWSSecretKey"),
+                     Settings["AWSAccessKey"],
+                     Settings["AWSSecretKey"],
                      RegionEndpoint.USEast1
                      );
 
@@ -804,15 +885,15 @@ namespace Backend
                     if (response.Datapoints.Count > 0)
                     {
                         var dataPoint = response.Datapoints[0];
-                        if (_cpuUtilization.ContainsKey(dimension.Value))
+                        //if (_cpuUtilization.ContainsKey(dimension.Value))
                         {
                             //if (_cpuUtilization[dimension.Value] < dataPoint.Maximum)
                             {
-                                Utils.WriteLog($"Instance: {dimension.Value} CPU Max load increased from: {_cpuUtilization[dimension.Value]} to {dataPoint.Maximum}", "info");
-                                _cpuUtilization[dimension.Value] = dataPoint.Maximum;
+                                //Utils.WriteLog($"Instance: {dimension.Value} CPU Max load increased from: {_cpuUtilization[dimension.Value]} to {dataPoint.Maximum}", "info");
+                                //_cpuUtilization[dimension.Value] = dataPoint.Maximum;
                             }
                         }
-                        else _cpuUtilization[dimension.Value] = dataPoint.Maximum;
+                        //else _cpuUtilization[dimension.Value] = dataPoint.Maximum;
 
                     }
                 }
@@ -831,15 +912,21 @@ namespace Backend
             {
                 var metrics = new[] { "CPUUtilization", "MemoryUtilization" };
 
-                var clusterName = $"{Settings.Get("ENV").ToLower()}-ECS-Cluster";
-                var serviceNames = new[] { $"{Settings.Get("ENV").ToLower()}-Facade-Service" , $"{Settings.Get("ENV").ToLower()}-Device-Service" , $"{Settings.Get("ENV").ToLower()}-Processing-Service" };
+                var clusterName = $"{Settings["ENV"].ToLower()}-ECS-Cluster";
+                var serviceNames = new[] { $"{Settings["ENV"].ToLower()}-Facade-Service" , $"{Settings["ENV"].ToLower()}-Device-Service" , $"{Settings["ENV"].ToLower()}-Processing-Service" };
 
                 var client = new AmazonCloudWatchClient(
-                     Settings.Get("AWSAccessKey"),
-                     Settings.Get("AWSSecretKey"), RegionEndpoint.USEast1
+                     Settings["AWSAccessKey"],
+                     Settings["AWSSecretKey"], RegionEndpoint.USEast1
                      );
 
                 Utils.WriteLog("---------------------------------------------------------------", "info");
+
+                var awsData = new AwsMetricsData();
+                awsData.CPUUtilization = new AWSData[serviceNames.Length];
+                awsData.MemoryUtilization = new AWSData[serviceNames.Length];
+
+                awsData.EventsInRDS = GetEventsNumber();              
 
                 foreach (var serviceName in serviceNames)
                 {
@@ -883,20 +970,34 @@ namespace Backend
                         if (resonseData.Count > 0)
                         {
                             var dataPoint = response.Datapoints[0];
-                            //if (_cpuUtilization.ContainsKey(serviceName))
-                            {
-                                //if (_cpuUtilization[dimension.Value] < dataPoint.Maximum)
-                                {
-                                    Utils.WriteLog($"{serviceName} {metric}: Max = {dataPoint.Maximum} Average = {dataPoint.Average} ", "info");
-                                    //_cpuUtilization[serviceName] = dataPoint.Maximum;
-                                }
-                            }
-                            // else _cpuUtilization[dimension.Value] = dataPoint.Maximum;
+                            Utils.WriteLog($"{serviceName} {metric}: Max = {dataPoint.Maximum} Average = {dataPoint.Average} ", "info");
 
+                            var awsServiceName = serviceName.Split('-')[1];
+                            var serviceId = (int)Enum.Parse(typeof(AWSServices), awsServiceName);
+                            
+                            if (metric == "CPUUtilization")
+                            {
+                                awsData.CPUUtilization[serviceId] = new AWSData()
+                                {
+                                    Time = dataPoint.Timestamp.ToLocalTime(),
+                                    Value = (int)(dataPoint.Maximum)
+                                };
+                            }
+                            else
+                            {
+                                awsData.MemoryUtilization[serviceId] = new AWSData()
+                                {
+                                    Time = dataPoint.Timestamp.ToLocalTime(),
+                                    Value = (int)(dataPoint.Maximum)
+                                };
+                            }
+                            
                         }
                     }
 
                 }
+
+                TriggerAwsDataUpdate(awsData);
 
                 Utils.WriteLog("---------------------------------------------------------------", "info");
 
@@ -908,31 +1009,104 @@ namespace Backend
 
         }
 
+        private void LumenisAuthenticate()
+        {
+            if (!string.IsNullOrEmpty(Settings["ACCESS_TOKEN"]))
+                return;
+
+            var authModel = new
+            {
+                email = Settings["API_USER"],
+                password = Settings["API_PASS"]
+            };
+
+            var client = _clientFactory.CreateClient();
+            var stringContent = new StringContent(JsonConvert.SerializeObject(authModel), Encoding.UTF8, "application/json");
+
+            var response = client.PostAsync(Settings["API_LOGIN_HOST"], stringContent).Result;
+
+            if (response.IsSuccessStatusCode)
+            {
+                var responseContent = response.Content;
+
+                // by calling .Result you are synchronously reading the result
+                string responseString = responseContent.ReadAsStringAsync().Result;
+                var obj = JObject.Parse(responseString);
+
+                Settings["ACCESS_TOKEN"] = obj["accessToken"].ToString();
+            }
+
+        }
+
+        private int GetEventsNumber()
+        {
+            int result = 0;
+            foreach (var device in _devices)
+            {
+                var eventsCount = 0;
+                string deviceType = device.DeviceType;
+                string deviceSerialNumber = device.DeviceSerialNumber;
+
+                LumenisAuthenticate();
+
+                var apiEventHost = Settings["API_PROCESSING_URL"];
+                var today = DateTime.Now.ToString("yyyy-MM-dd");
+                var yesterday = DateTime.Now.AddDays(-1).ToString("yyyy-MM-dd");
+
+                var apiEventUrl = $"{apiEventHost}/events?deviceSerialNumber={deviceSerialNumber}&deviceType={deviceType}&from={yesterday}T00:00:00.015Z&to={today}T23:59:59.015Z";
+
+                var requestMessage = new HttpRequestMessage
+                {
+                    Method = HttpMethod.Get,
+                    RequestUri = new Uri(apiEventUrl)
+                };
+
+                requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", Settings["ACCESS_TOKEN"]);
+
+                var client = _clientFactory.CreateClient();
+                var response = client.SendAsync(requestMessage).Result;
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var responseContent = response.Content;
+
+                    // by calling .Result you are synchronously reading the result
+                    string responseString = responseContent.ReadAsStringAsync().Result;
+                    var obj = JObject.Parse(responseString);
+
+                    eventsCount = ((JArray)obj["data"]).Count;
+                }
+
+                result += eventsCount;
+            }
+
+            return result;
+        }
+
         /// <summary>
         /// Resets backend
         /// </summary>
         public void Reset()
         {
-            Utils.LoadConfig();
+            
             _agents.Clear();
-            string agentsPath = Settings.Get("AGENTS_PATH");
-            string outputPath = Settings.Get("OUTPUT");
-            string returncodePath = Settings.Get("RETURN_CODE");
-            string logfilePath =  Settings.Get("LOG_FILE_PATH");
+            string agentsPath = Settings["AGENTS_PATH"];
+            string outputPath = Settings["OUTPUT"];
+            
+            string logfilePath =  Settings["LOG_FILE_PATH"];
             File.Delete(agentsPath);
             File.Delete(outputPath);
-            File.Delete(returncodePath);
+            
             File.Delete(logfilePath);
         }
 
         public string TestCommand(string num)
         {
-            Utils.LoadConfig();
-
+            
             try
             {
-                string pythonPath = Settings.Get("PYTHON");
-                string pythonScriptsPath = Settings.Get("PYTHON_SCRIPTS_PATH");
+                string pythonPath = Settings["PYTHON"];
+                string pythonScriptsPath = Settings["PYTHON_SCRIPTS_PATH"];
                 int returnCode = Utils.RunCommand(pythonPath, "pythonScript.py", num, pythonScriptsPath, @"D:\test_center\out.txt");
                 var output = Utils.ReadFileContent(@"D:\test_center\out.txt");
                 return "success";
@@ -942,6 +1116,39 @@ namespace Backend
             {
                 Utils.WriteLog($"Error: {ex.StackTrace}", "error");
                 return "fail";
+            }
+        }
+
+        public void PrepareCenter()
+        {
+            var devicesLogsFolder = Settings["DEVICE_LOGS_DIR"];
+            if (Directory.Exists(devicesLogsFolder))
+            {
+                CleanUpFolderContent(devicesLogsFolder);
+            }
+
+            var devicesResultsFolder = Settings["DEVICE_RESULTS_DIR"];
+            if (Directory.Exists(devicesResultsFolder))
+            {
+                CleanUpFolderContent(devicesResultsFolder);
+            }
+
+            var logFilePath = Settings["LOG_FILE_PATH"];
+            if (File.Exists(logFilePath))
+            {
+                File.Delete(logFilePath);
+            }
+
+            var outputFilePath = Settings["OUTPUT"];
+            if (File.Exists(outputFilePath))
+            {
+                File.Delete(outputFilePath);
+            }
+
+            var returnFilePath = Settings["RETURN_CODE"];
+            if (File.Exists(returnFilePath))
+            {
+                File.Delete(returnFilePath);
             }
         }
     }

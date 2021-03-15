@@ -42,8 +42,8 @@ if __name__ == "__main__":
         scriptFile = config['ACTIVATION_SCRIPT_PATH']
         delayBeforeStoppingServer = 0
 
-        if int(config['SCENARIO']) == 2:
-            delayBeforeStoppingServer = 2*int(config['MINUTES_TO_KEEP_STOPPED'])
+        if config['SCENARIO_STOP_AWS'].lower() == 'true':
+            delayBeforeStoppingServer = 2*int(config['SCENARIO_MINUTES_TO_KEEP_STOPPED'])
 
         agentRecords = ReadRecordsFromJsonFile(agentsFile)
         scriptContent = ReadContentFromFile(scriptFile)

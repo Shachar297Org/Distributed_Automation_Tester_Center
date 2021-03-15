@@ -10,9 +10,11 @@ namespace Console.Models
         {
             DeviceType = ga;
             DeviceSerialNumber = sn;
+            Finished = false;
         }
 
         public string DeviceType { get; set; }
         public string DeviceSerialNumber { get; set; }
+        public bool Finished { get; set; }
     }
 }

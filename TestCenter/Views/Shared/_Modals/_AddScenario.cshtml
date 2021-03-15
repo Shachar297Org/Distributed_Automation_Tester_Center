@@ -1,0 +1,67 @@
+﻿@model TestCenter.ViewModels.ScenarioViewModel
+
+
+<form asp-action="AddScenario" asp-controller="UI" method="post" enctype="multipart/form-data">
+    @Html.AntiForgeryToken()
+
+    <input type="hidden" asp-for="Id" />
+    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+    <div class="form-group">
+        <label asp-for="Name" class="control-label">Scenario Name</label>
+        <input asp-for="Name" class="form-control" />
+        <span asp-validation-for="Name" class="text-danger"></span>
+    </div>
+    <div class="form-group">
+        <label asp-for="DevicesNumber" class="control-label">Number of devices</label>
+        <input type="number" asp-for="DevicesNumber" class="form-control" />
+        <span asp-validation-for="DevicesNumber" class="text-danger"></span>
+    </div>
+    <div class="form-group">
+        <label asp-for="DevicesType" class="control-label">Devices type</label>
+        <input asp-for="DevicesType" class="form-control" />
+        <span asp-validation-for="DevicesType" class="text-danger"></span>
+    </div>
+    <div class="form-group">
+        <label asp-for="InsertionStrategy" class="control-label">Insertion strategy for devices</label>
+        <select asp-for="InsertionStrategy" asp-items="Html.GetEnumSelectList<TestCenterConsole.Models.InsertionStrategy>()" id="formrow-inputEnv" class="form-control">
+        </select>
+
+    </div>
+
+    <div class="form-group">
+        <label asp-for="MinutesToWaitForAgents" class="control-label">Minutes for server to wait for agents to connect</label>
+        <input type="number" asp-for="MinutesToWaitForAgents" class="form-control" />
+        <span asp-validation-for="MinutesToWaitForAgents" class="text-danger"></span>
+    </div>
+
+    <div class="form-group">
+
+        <div class="custom-control custom-checkbox">
+            <input type="checkbox" class="custom-control-input" asp-for="StopAws">
+            <label asp-for="StopAws" class="custom-control-label">Stop AWS ECS Services</label>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label asp-for="MinutesServicesStopped" class="control-label">Minutes for AWS ECS services to be stopped</label>
+        <input asp-for="MinutesServicesStopped" class="form-control" />
+        <span asp-validation-for="MinutesServicesStopped" class="text-danger"></span>
+    </div>
+
+    <div class="form-group">
+        <label asp-for="Services" class="control-label">Select AWS ECS services to be stopped in the middle of the process</label>
+        @Html.ListBoxFor(model => model.Services, new MultiSelectList(Enum.GetValues(typeof(TestCenterConsole.Models.AWSServices)), Model.Services), new { @class = "form-control", multiple = "multiple", id = "Services" })
+    </div>
+
+
+
+    <div class="form-group">
+        <button type="submit" class="btn btn-outline-primary w-md">Submit</button>
+    </div>
+</form>
+
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+}

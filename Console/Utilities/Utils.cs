@@ -80,10 +80,6 @@ namespace Console.Utilities
             
         }
 
-        private static void Process_ErrorDataReceived(object sender, DataReceivedEventArgs e)
-        {
-            
-        }
 
         /// <summary>
         /// Read agent list from json file
@@ -163,27 +159,12 @@ namespace Console.Utilities
             
         }
 
-        public static void LoadConfig()
-        {
-            string configFilePath = "D:/Config/test_center_config.txt";
-            using (var streamReader = File.OpenText(configFilePath))
-            {
-                Settings.settingsDict["CONFIG_FILE"] = configFilePath;
-                var lines = streamReader.ReadToEnd().Split("\r\n".ToCharArray(), StringSplitOptions.RemoveEmptyEntries);
-                foreach (string line in lines)
-                {
-                    string[] fields = line.Split('=');
-                    Settings.settingsDict[fields[0]] = fields[1];
-                }
-            }
-        }
-
         public static void WriteLog(string msg, string level)
         {
             _readWriteLock.EnterWriteLock();
             try
             {
-                using (StreamWriter writer = new StreamWriter(Settings.Get("LOG_FILE_PATH"), append: true))
+                using (StreamWriter writer = new StreamWriter(Settings.GetInstance("D:/Config/test_center_config.txt")["LOG_FILE_PATH"], append: true))
                 {
                     string nowTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
                     writer.WriteLine($"{nowTime} [{level.ToUpper()}] : {msg}");
@@ -195,7 +176,7 @@ namespace Console.Utilities
             }               
         }
 
-        public static void WriteRecordsToCsv(string csvFileByDevice, List<Event> events)
+        public static void WriteEventsToCsv(string csvFileByDevice, List<Event> events)
         {
             using (StreamWriter writer = new StreamWriter(csvFileByDevice))
             {
@@ -204,6 +185,18 @@ namespace Console.Utilities
                 {
                     writer.WriteLine($"{e.EventDeviceSerialNumber},{e.EventDeviceType},{e.EventKey},{e.EventValue},{e.CreationTime}");
                 }     
+            }
+        }
+
+        public static void WriteDevicesToCsv(string csvFile, List<LumenisXDevice> devices)
+        {
+            using (StreamWriter writer = new StreamWriter(csvFile))
+            {
+                writer.WriteLine($"deviceType,deviceSerialNumber");
+                foreach (var device in devices)
+                {
+                    writer.WriteLine($"{device.DeviceType},{device.DeviceSerialNumber}");
+                }
             }
         }
     }

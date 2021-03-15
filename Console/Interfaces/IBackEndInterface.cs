@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Console.Models;
+using TestCenterConsole.Models;
 
 namespace Console.Interfaces
 {
@@ -22,9 +23,15 @@ namespace Console.Interfaces
 
         Task Init();
 
-        string TestCommand(string num);
+        event EventHandler<AwsMetricsData> AwsDataUpdated;
+        event EventHandler<StageData> StageDataUpdated;
 
         List<string> GetAgents();
+        
+        void UpdateScenarioSettings(Scenario scenario);
+        void UpdateCenterSettings(TestCenterSettings settings);
+
         void Reset();
+
     }
 }
