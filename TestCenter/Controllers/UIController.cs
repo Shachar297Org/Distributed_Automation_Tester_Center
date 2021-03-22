@@ -1,7 +1,7 @@
 ﻿using Console;
 using Console.Interfaces;
 using TestCenterConsole.Models;
-using Console.Utilities;
+using TestCenterConsole.Utilities;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
 using System;
@@ -15,6 +15,8 @@ using TestCenter.Hubs;
 using System.Net.Http;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
+using System.IO;
+using Console.Utilities;
 
 namespace TestCenterApp.Controllers
 {
@@ -46,26 +48,69 @@ namespace TestCenterApp.Controllers
             {
                 _backEnd.AwsDataUpdated += UpdateAwsDataUI;
                 _backEnd.StageDataUpdated += UpdateStageDataUI;
+                _backEnd.AgentDataUpdated += UpdateAgentDataUI;
 
                 _subscribed = true;
             }
             
         }
 
+        private void UpdateAgentDataUI(object sender, AgentData agentData)
+        {
+            var agentIndex = _model.ProgressData.AgentsData.FindIndex(a => a.URL == agentData.URL);
+            if (agentIndex == -1)
+            {
+                _model.ProgressData.AgentsData.Add(agentData);
+            }
+            else
+            {
+                _model.ProgressData.AgentsData[agentIndex].ClientsNumber = agentData.ClientsNumber;
+                _model.ProgressData.AgentsData[agentIndex].ServersNumber = agentData.ServersNumber;
+                _model.ProgressData.AgentsData[agentIndex].TotalEvents = agentData.TotalEvents;
+               
+                if (agentData.Devices.Count != 0)
+                {
+                    _model.ProgressData.AgentsData[agentIndex].Devices = agentData.Devices;
+                }               
+
+            }
+
+            _hub.Clients.All.SendAsync("agentsData", _model.ProgressData.AgentsData);
+        }
+
         private void UpdateAwsDataUI(object sender, AwsMetricsData measurementData)
         {
-            var isPresent = _model.ProgressData.AwsMetricsData.Count(d => d.CPUUtilization[0].Time.Equals(measurementData.CPUUtilization[0].Time));
+            var awsDataPred = _model.ProgressData.AwsMetricsData.Where(d => d.CPUUtilization[0].Time.Equals(measurementData.CPUUtilization[0].Time));
             
-            if (isPresent == 0)
+            if (awsDataPred.Count() == 0)
             {
                 _model.ProgressData.AwsMetricsData.Add(measurementData);
                 _hub.Clients.All.SendAsync("awsData", measurementData);
             }            
+            else
+            {
+                var awsData = new AwsMetricsData();
+                awsData.EventsInRDS = measurementData.EventsInRDS;
+
+                var awsDataModel = awsDataPred.FirstOrDefault();
+                awsDataModel.EventsInRDS = measurementData.EventsInRDS;
+
+                _hub.Clients.All.SendAsync("awsData", awsData);
+            }
         }
 
         private void UpdateStageDataUI(object sender, StageData stageData)
         {
-            _model.ProgressData.StageData.Add(stageData);
+            //var stagePred = _model.ProgressData.StageData.Where(s => s.Stage == stageData.Stage);
+            //if (stagePred.Count() == 0)
+            {
+                _model.ProgressData.StageData.Add(stageData);
+            }
+            //else
+            //{
+            //    stagePred.FirstOrDefault().DevicesNumberFinished = stageData.DevicesNumberFinished;
+            //}
+
             _hub.Clients.All.SendAsync("stageData", stageData);
         }
 
@@ -78,7 +123,7 @@ namespace TestCenterApp.Controllers
             List<AgentViewModel> newAgents = new List<AgentViewModel>();
             foreach (var agent in _model.Agents)
             {
-                newAgents.Add(await GetAgentData(agent));
+                newAgents.Add(await GetAgentInitData(agent));
             }
 
             _model.Agents = newAgents;
@@ -105,6 +150,13 @@ namespace TestCenterApp.Controllers
 
             //specify the name or path of the partial view
             return PartialView("_Modals/_CenterSettings", _model);
+        }
+
+        public IActionResult GetScriptLog(string device)
+        {
+            var scriptLog = _backEnd.GetScriptLog(device);
+
+            return Ok(scriptLog);
         }
 
         public IActionResult ShowAddAgent(int? id)
@@ -137,7 +189,10 @@ namespace TestCenterApp.Controllers
             }
             else
             {
-                _model.Agents.Add(agentVM);
+                if (_model.Agents.Count(a => (a.Name == agentVM.Name) || (a.IPAddress == agentVM.IPAddress && a.Port == agentVM.Port)) == 0)
+                {
+                    _model.Agents.Add(agentVM);
+                }                
             }            
 
             return RedirectToAction("index");
@@ -206,7 +261,7 @@ namespace TestCenterApp.Controllers
         }
 
 
-        private async Task<AgentViewModel> GetAgentData(AgentViewModel agent)
+        private async Task<AgentViewModel> GetAgentInitData(AgentViewModel agent)
         {
             var request = new HttpRequestMessage(HttpMethod.Get, agent.IPAddress + ":" + agent.Port.ToString() + "/getAgentSettings");
 
@@ -226,9 +281,10 @@ namespace TestCenterApp.Controllers
                     isLive = true;
                 }
             }
-            catch (HttpRequestException httpRequestException)
+            catch (Exception ex)
             {
-
+                Utils.WriteLog(ex.Message, "error");
+                Utils.WriteLog(ex.StackTrace, "error");
             }
             agent.Status = isLive ? AgentStatus.LIVE : AgentStatus.OFFLINE;
 
@@ -261,9 +317,10 @@ namespace TestCenterApp.Controllers
                         }
                     }
                 }
-                catch (HttpRequestException httpRequestException)
+                catch(Exception ex)
                 {
-
+                    Utils.WriteLog(ex.Message, "error");
+                    Utils.WriteLog(ex.StackTrace, "error");
                 }
             }
 
@@ -275,16 +332,22 @@ namespace TestCenterApp.Controllers
         {
             bool result = true;
             foreach (var agent in _model.Agents.Where(a => a.Status == AgentStatus.LIVE))
-            {
-
-
-                var request = new HttpRequestMessage(HttpMethod.Get, agent.IPAddress + ":" + agent.Port.ToString() + "/init");
+            {                
 
                 var client = _clientFactory.CreateClient();
 
                 try
                 {
+                    var request = new HttpRequestMessage(HttpMethod.Post, agent.IPAddress + ":" + agent.Port.ToString() + "/stop");
                     var response = await client.SendAsync(request);
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        Utils.WriteLog($"Stopped running devices processes on agent {agent.Name}", "info");
+                    }
+
+                    request = new HttpRequestMessage(HttpMethod.Get, agent.IPAddress + ":" + agent.Port.ToString() + "/init");
+                    response = await client.SendAsync(request);
 
                     if (response.IsSuccessStatusCode)
                     {
@@ -293,12 +356,15 @@ namespace TestCenterApp.Controllers
                         var dic = JsonConvert.DeserializeObject<Dictionary<string, string>>(responseString);
                         var res = bool.Parse(dic["Result"]);
 
+                        Utils.WriteLog($"Sent init to on agent {agent.Name}", "info");
+
                         result = result && res;
                     }
                 }
-                catch (HttpRequestException httpRequestException)
+                catch (Exception ex)
                 {
-
+                    Utils.WriteLog(ex.Message, "error");
+                    Utils.WriteLog(ex.StackTrace, "error");
                 }
             }
 

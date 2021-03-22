@@ -12,6 +12,7 @@ using System.Net;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
+using Newtonsoft.Json;
 
 
 namespace TestCenterApp.Controllers
@@ -45,10 +46,6 @@ namespace TestCenterApp.Controllers
             int agentPort = port;
             string agentIP = Request.HttpContext.Connection.RemoteIpAddress.ToString();
             string agentUrl = string.Join(":", agentIP, agentPort);
-            //if (!agentUrl.Contains("http://"))
-            //{
-            //    agentUrl = "http://" + agentUrl;
-            //}
 
             bool result = await _backEnd.Connect(agentUrl);
 
@@ -77,11 +74,6 @@ namespace TestCenterApp.Controllers
             string agentIP = Request.HttpContext.Connection.RemoteIpAddress.ToString();
             string url = string.Join(":", agentIP, agentPort);
 
-            //if (!url.Contains("http://"))
-            //{
-            //    url = "http://" + url;
-            //}
-
             try
             {
                 bool result = await _backEnd.AgentReady(url);
@@ -92,6 +84,9 @@ namespace TestCenterApp.Controllers
             }
             catch (Exception ex)
             {
+                Utils.WriteLog(ex.Message, "error");
+                Utils.WriteLog(ex.StackTrace, "error");
+
                 string msg = $"Error: {ex.Message}";
                 var response = new HttpResponseMessage(HttpStatusCode.InternalServerError);
                 response.Content = new StringContent(("{result:" + msg + "}"), Encoding.UTF8, "application/json");
@@ -102,26 +97,26 @@ namespace TestCenterApp.Controllers
         // POST: getScriptLog
         [HttpPost]
         [Route("getScriptLog")]
-        public async Task<HttpResponseMessage> GetScriptLog()
+        public async Task<HttpResponseMessage> GetScriptLog([FromBody] ScriptLog scriptLog)
         {
             string agentIP = Request.HttpContext.Connection.RemoteIpAddress.ToString();
-            //if (!agentIP.Contains("http://"))
-            //{
-            //    agentIP = "http://" + agentIP;
-            //}
+            string url = string.Join(':', agentIP, scriptLog.Port);
 
             try
             {
-                string jsonContent = await Request.ReadFromJsonAsync<string>();
-                await _backEnd.GetScriptLog(agentIP, jsonContent);
+                await _backEnd.GetScriptLog(url, scriptLog);
+
                 string msg = "Script log was received";
                 var response = new HttpResponseMessage(HttpStatusCode.OK);
                 response.Content = new StringContent(("{result:" + msg + "}"), Encoding.UTF8, "application/json");
                 return response;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
                 string msg = "Script log was not received";
+                Utils.WriteLog(ex.Message, "error");
+                Utils.WriteLog(ex.StackTrace, "error");
+
                 var response = new HttpResponseMessage(HttpStatusCode.InternalServerError);
                 response.Content = new StringContent(("{result:" + msg + "}"), Encoding.UTF8, "application/json");
                 return response;
@@ -134,10 +129,6 @@ namespace TestCenterApp.Controllers
         public async Task<HttpResponseMessage> GetComparisonResults()
         {
             string agentIP = Request.HttpContext.Connection.RemoteIpAddress.ToString();
-            //if (!agentIP.Contains("http://"))
-            //{
-            //    agentIP = "http://" + agentIP;
-            //}
 
             try
             {
@@ -148,8 +139,11 @@ namespace TestCenterApp.Controllers
                 response.Content = new StringContent(("{result:" + msg + "}"), Encoding.UTF8, "application/json");
                 return response;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                Utils.WriteLog(ex.Message, "error");
+                Utils.WriteLog(ex.StackTrace, "error");
+
                 string msg = "Comparison results were not received";
                 var response = new HttpResponseMessage(HttpStatusCode.InternalServerError);
                 response.Content = new StringContent(("{result:" + msg + "}"), Encoding.UTF8, "application/json");
@@ -163,21 +157,21 @@ namespace TestCenterApp.Controllers
         public async Task<HttpResponseMessage> SendEventsLog([FromBody] EventsLog eventsLog)
         {
             string agentIP = Request.HttpContext.Connection.RemoteIpAddress.ToString();
-            //if (!agentIP.Contains("http://"))
-            //{
-            //    agentIP = "http://" + agentIP;
-            //}
+            var url = agentIP + ":" + eventsLog.Port;
 
             try
             {
-                await _backEnd.GetComparisonResults(agentIP, eventsLog);
+                await _backEnd.GetComparisonResults(url, eventsLog);
                 string msg = "Comparison results were received";
                 var response = new HttpResponseMessage(HttpStatusCode.OK);
                 response.Content = new StringContent(("{result:" + msg + "}"), Encoding.UTF8, "application/json");
                 return response;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                Utils.WriteLog(ex.Message, "error");
+                Utils.WriteLog(ex.StackTrace, "error");
+
                 string msg = "Comparison results were not received";
                 var response = new HttpResponseMessage(HttpStatusCode.InternalServerError);
                 response.Content = new StringContent(("{result:" + msg + "}"), Encoding.UTF8, "application/json");

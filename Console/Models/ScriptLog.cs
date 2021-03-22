@@ -14,5 +14,17 @@ namespace Console.Models
 
         public string DeviceName { get; set; }
         public string Content { get; set; }
+        public int Port { get; set; }
+    }
+
+    public class ScriptsData
+    {
+        public List<ScriptData> Tests { get; set; }
+    }
+
+    public class ScriptData
+    {
+        public string Label { get; set; }
+        public int NumRepeats { get; set; }
     }
 }

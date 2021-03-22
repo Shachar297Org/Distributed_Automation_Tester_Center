@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 
-namespace Console.Utilities
+namespace TestCenterConsole.Utilities
 {
     public class Settings
     {       

@@ -7,6 +7,8 @@ using System.Diagnostics;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using TestCenterConsole.Models;
+using TestCenterConsole.Utilities;
 
 namespace Console.Utilities
 {
@@ -86,15 +88,15 @@ namespace Console.Utilities
         /// </summary>
         /// <param name="jsonFile">json file</param>
         /// <returns>list of agent objects</returns>
-        public static List<Agent> ReadAgentsFromFile(string agentsFilePath)
+        public static List<AgentData> ReadAgentsFromFile(string agentsFilePath)
         {
-            List<Agent> agentList = null;
+            List<AgentData> agentList = null;
             try
             {
                 using (StreamReader reader = new StreamReader(agentsFilePath))
                 {
                     string json = reader.ReadToEnd();
-                    agentList = JsonConvert.DeserializeObject<List<Agent>>(json);
+                    agentList = JsonConvert.DeserializeObject<List<AgentData>>(json);
                 }
             }
             catch (Exception ex)
@@ -104,7 +106,7 @@ namespace Console.Utilities
             }
             if (agentList == null)
             {
-                agentList = new List<Agent>();
+                agentList = new List<AgentData>();
             }
             return agentList;
         }
@@ -114,7 +116,7 @@ namespace Console.Utilities
         /// </summary>
         /// <param name="list">agent list</param>
         /// <param name="jsonFile">json file</param>
-        public static void WriteAgentListToFile(List<Agent> list, string agentsFilePath)
+        public static void WriteAgentListToFile(List<AgentData> list, string agentsFilePath)
         {
             string jsonObj = JsonConvert.SerializeObject(list);
             WriteToFile(agentsFilePath, jsonObj, append: false);

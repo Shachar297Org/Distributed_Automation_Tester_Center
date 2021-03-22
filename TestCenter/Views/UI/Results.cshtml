@@ -8,3 +8,119 @@
     Layout = "~/Views/Shared/_Layout.cshtml";
 
 }
+
+@foreach (var agent in Model.Agents)
+{
+    <div class="row">
+        <div class="col-lg-12">
+            <div class="card">
+                <div class="card-body">
+                    <h4 class="card-title mb-4">Agent @agent.Name Data</h4>
+                    <div class="card-title mb-4"><span>@agent.IPAddress:@agent.Port</span></div>
+                    <div class="table-responsive">
+                        <table class="table table-centered table-nowrap mb-0">
+                            <thead class="thead-light">
+                                <tr>
+
+                                    <th>Device Serial Number</th>
+                                    <th>Device Type</th>
+                                    <th>Total Events</th>
+                                    <th>Events in RDS</th>
+                                    <th>Finished</th>
+                                    <th>Success</th>
+                                    <th>Script Log</th>
+
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @{
+                                    var url = agent.URL.Split('/')[2];
+                                    var agentData = Model.ProgressData.AgentsData.Where(a => a.URL == url).FirstOrDefault();
+                                    if (agentData != null)
+                                    {
+                                        foreach (var device in agentData.Devices)
+                                        {
+
+                                            <tr>
+
+                                                <td>@device.DeviceSerialNumber</td>
+                                                <td>@device.DeviceType</td>
+                                                <td>
+                                                    @agentData.TotalEvents
+                                                </td>
+                                                <td>
+                                                    @device.EventsInRDS
+                                                </td>
+                                                <td>
+                                                    <span class="badge badge-pill @(device.Finished ? "badge-soft-success" : "badge-soft-danger") font-size-12">@(device.Finished ? "YES" : "NO")</span>
+                                                </td>
+                                                <td>
+                                                    <span class="badge badge-pill @(agentData.TotalEvents == device.EventsInRDS && agentData.TotalEvents > 0 && device.Success ? "badge-soft-success" : "badge-soft-danger") font-size-12">@(agentData.TotalEvents == device.EventsInRDS && agentData.TotalEvents > 0 && device.Success)</span>
+                                                </td>
+                                                <td>
+                                                    <!-- Button trigger modal -->
+                                                    <button type="button" class="btn btn-outline-primary btn-sm btn-rounded waves-effect waves-light" onclick="openLogModal('@device.DeviceSerialNumber', '@device.DeviceType')">
+                                                        View Script Log
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        }
+                                    }
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                    <!-- end table-responsive -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+}
+
+<!-- Modal -->
+<div class="modal fade scriptLogModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="exampleModalLabel">Script Log</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+
+                <code id="log">No data</code>
+
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- end modal -->
+<!-- JAVASCRIPT -->
+<script src="~/assets/libs/jquery/jquery.min.js"></script>
+<script src="~/assets/libs/bootstrap/js/bootstrap.bundle.min.js"></script>
+<script src="~/assets/libs/metismenu/metisMenu.min.js"></script>
+<script src="~/assets/libs/simplebar/simplebar.min.js"></script>
+<script src="~/assets/libs/node-waves/waves.min.js"></script>
+<script src="~/assets/js/lang/jquery.multiLanguage.js"></script>
+
+<script type="text/javascript">
+    function openLogModal(deviceName, deviceType) {
+
+        var device = deviceName + '_' + deviceType;
+        $.get("/ui/GetScriptLog?device=" + device,
+            function (data) {
+                if (data != "") {
+                    $(".scriptLogModal #log").html(data);
+                }                
+            });
+
+
+        $('.scriptLogModal').modal('show');
+    }
+    
+</script>

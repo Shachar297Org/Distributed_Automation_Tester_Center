@@ -191,7 +191,7 @@
                                 <div class="media">
                                     <div class="media-body">
                                         <p class="text-muted font-weight-medium">Number of Agents</p>
-                                        <h4 class="mb-0" id="numberOfAgents">@(Model.Agents.Where(a => a.Status == AgentStatus.LIVE).Count())</h4>
+                                        <h4 class="mb-0" id="numberOfAgents">@(Model.Agents.Where(a => a.Status == TestCenterConsole.Models.AgentStatus.LIVE).Count())</h4>
                                     </div>
 
                                     <div class="avatar-sm rounded-circle bg-secondary align-self-center mini-stat-icon">
@@ -256,7 +256,10 @@
 
 @for (int i = 0; i < Model.Agents.Count; i++)
 {
-    <div class="row">
+
+    var agentData = Model.ProgressData.AgentsData.Count > 0 ? Model.ProgressData.AgentsData[i] : null;
+
+    <div class="row agent-@i">
         <div class="col-lg-12">
             <div class="card">
                 <div class="card-body">
@@ -281,25 +284,25 @@
                                     <div class="col-2">
                                         <div>
                                             <p class="text-muted text-truncate mb-2">Total devices</p>
-                                            <h5 class="mb-0" id="agentDevicesNumber">@(Model.Scenarios.Where(s => s.Status == ScenarioStatus.EXECUTING).FirstOrDefault() != null ? Model.Scenarios.Where(s => s.Status == ScenarioStatus.EXECUTING).FirstOrDefault().DevicesNumber / Model.Agents.Count : "-")</h5>
+                                            <h5 class="mb-0" id="agentDevicesNumber">@(Model.ProgressData.AgentsData.Count > 0 && Model.ProgressData.AgentsData[i].Devices.Count > 0 ? Model.ProgressData.AgentsData[i].Devices.Count : "-")</h5>
                                         </div>
                                     </div>
                                     <div class="col-4">
                                         <div>
                                             <p class="text-muted text-truncate mb-2">Status</p>
-                                            <h5 class="mb-0" id="agentStatus">-</h5>
+                                            <h5 class="badge badge-soft-success" id="agentStatus">@(agentData != null ? agentData.Status : "-")</h5>
                                         </div>
                                     </div>
                                     <div class="col-2">
                                         <div>
                                             <p class="text-muted text-truncate mb-2">Clients running</p>
-                                            <h5 class="mb-0" id="agentClientsRunning">-</h5>
+                                            <h5 class="mb-0" id="agentClientsRunning">@(agentData != null ? agentData.ClientsNumber : "-")</h5>
                                         </div>
                                     </div>
                                     <div class="col-2">
                                         <div>
                                             <p class="text-muted text-truncate mb-2">Servers running</p>
-                                            <h5 class="mb-0" id="agentsServersRunning">-</h5>
+                                            <h5 class="mb-0" id="agentsServersRunning">@(agentData != null ? agentData.ServersNumber : "-")</h5>
 
                                         </div>
                                     </div>
@@ -405,7 +408,3 @@
 
 <script src="~/js/site.js"></script>
 
-<script type="text/javascript">
-
-
-</script>

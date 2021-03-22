@@ -2,10 +2,13 @@
 
   <PropertyGroup>
     <TargetFramework>net5.0</TargetFramework>
+    <UserSecretsId>0695b91a-fb8b-460e-984d-56bd9e5b9f58</UserSecretsId>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
     <WarningLevel>0</WarningLevel>
+    <PreserveCompilationContext>true</PreserveCompilationContext>
+    <MvcRazorCompileOnPublish>false</MvcRazorCompileOnPublish>
   </PropertyGroup>
 
   <ItemGroup>
@@ -26,4 +29,8 @@
     <ProjectReference Include="..\Console\Console.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="wwwroot\*" />
+  </ItemGroup>
+  
 </Project>

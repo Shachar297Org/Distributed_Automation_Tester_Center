@@ -23,6 +23,7 @@ using System.Net.Http;
 using System.Text;
 using Newtonsoft.Json.Linq;
 using System.Net.Http.Headers;
+using TestCenterConsole.Utilities;
 
 namespace Console
 {
@@ -32,9 +33,10 @@ namespace Console
         private static System.Timers.Timer _getAWSResourcesTimer = new System.Timers.Timer(new TimeSpan(0, 2, 0).TotalMilliseconds);
         private static System.Timers.Timer _stopECSTaskTimer = new System.Timers.Timer(new TimeSpan(0, 1, 0).TotalMilliseconds);
 
-        private static List<Agent> _agents = new List<Agent>();
-       
         private static HashSet<LumenisXDevice> _devices = new HashSet<LumenisXDevice>();
+
+        private static List<AgentData> _agentsData = new List<AgentData>();
+        private static StageData _stageData = new StageData();
 
         private static List<string> _servicesToStop = new List<string>();
 
@@ -46,6 +48,7 @@ namespace Console
 
         public event EventHandler<AwsMetricsData> AwsDataUpdated;
         public event EventHandler<StageData> StageDataUpdated;
+        public event EventHandler<AgentData> AgentDataUpdated;
 
         IHttpClientFactory _clientFactory;
 
@@ -106,7 +109,14 @@ namespace Console
             // call all subscribers
             if (StageDataUpdated != null) // make sure there are subscribers!
                 StageDataUpdated(this, data); // trigger the event
-        }      
+        }
+
+        private void TriggerAgentDataUpdate(AgentData data)
+        {
+            // call all subscribers
+            if (AgentDataUpdated != null) // make sure there are subscribers!
+                AgentDataUpdated(this, data); // trigger the event
+        }
 
 
         /// <summary>
@@ -178,11 +188,14 @@ namespace Console
             {
                 Utils.WriteLog($"-----INIT STAGE END-----", "info");
 
-                var stageData = new StageData();
-                stageData.Stage = Stage.AGENTS_CONNECT.ToString();
-                stageData.StageIdx = Stage.AGENTS_CONNECT;
-                stageData.Time = DateTime.Now;
-                TriggerStageDataUpdate(stageData);
+                if (_stageData.StageIdx != Stage.AGENTS_CONNECT)
+                {
+                    _stageData.Stage = Stage.AGENTS_CONNECT.ToString();
+                    _stageData.StageIdx = Stage.AGENTS_CONNECT;
+                    _stageData.Time = DateTime.Now;
+                     TriggerStageDataUpdate(_stageData);
+                }
+
             }
         }
 
@@ -335,13 +348,12 @@ namespace Console
         private void GetAgentConnectTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
         {  
             Utils.WriteLog($"*****Connect timer stop*****", "info");
-            Utils.WriteAgentListToFile(_agents, Settings["AGENTS_PATH"]);
+            Utils.WriteAgentListToFile(_agentsData, Settings["AGENTS_PATH"]);
 
-            var stageData = new StageData();
-            stageData.Stage = Stage.DISTRIBUTE_DEVICES.ToString();
-            stageData.StageIdx = Stage.DISTRIBUTE_DEVICES;
-            stageData.Time = DateTime.Now;
-            TriggerStageDataUpdate(stageData);
+            _stageData.Stage = Stage.DISTRIBUTE_DEVICES.ToString();
+            _stageData.StageIdx = Stage.DISTRIBUTE_DEVICES;
+            _stageData.Time = DateTime.Now;
+            TriggerStageDataUpdate(_stageData);
             
             DistributeDevicesAmongAgents();
         }
@@ -351,10 +363,10 @@ namespace Console
         /// </summary>
         private void StartSendingScript()
         { 
-            Utils.WriteAgentListToFile(_agents, Settings["AGENTS_PATH"]);
+            //Utils.WriteAgentListToFile(_agents, Settings["AGENTS_PATH"]);
 
             Utils.WriteLog($"Starting AWS resources timer", "info");
-            _getAWSResourcesTimer.Start();
+            _getAWSResourcesTimer.Start();            
 
             SendAutomationScript();
         }
@@ -370,11 +382,14 @@ namespace Console
 
             try
             {
-                var stageData = new StageData();
-                stageData.Stage = Stage.INIT.ToString();
-                stageData.StageIdx = Stage.INIT;
-                stageData.Time = DateTime.Now;
-                TriggerStageDataUpdate(stageData);
+                if (_stageData.StageIdx < Stage.INIT)
+                {
+                    _stageData.Stage = Stage.INIT.ToString();
+                    _stageData.StageIdx = Stage.INIT;
+                    _stageData.Time = DateTime.Now;
+                    TriggerStageDataUpdate(_stageData);
+                }
+
                 
                 Utils.WriteLog($"-----CONNECT STAGE BEGIN-----", "info");
                 string agentsPath = Settings["AGENTS_PATH"];
@@ -385,9 +400,9 @@ namespace Console
 
                 Utils.WriteLog($"Agent {agentUrl}: entering critical code...", "info");
 
-                Utils.WriteLog($"Current agents number: {_agents.Count}.", "info");
+                Utils.WriteLog($"Current agents number: {_agentsData.Count}.", "info");
 
-                if (_agents.Count == 0)
+                if (_agentsData.Count == 0)
                 {
                     await Init();
                 }
@@ -397,8 +412,8 @@ namespace Console
                     agentUrl = agentUrl.Replace("127.0.0.1", "localhost").Replace("::1", "localhost");
                 }
 
-                Agent agent = _agents.Find(a => a.URL == agentUrl);
-                if (agent != null)
+                AgentData agentData = _agentsData.Find(a => a.URL == agentUrl);
+                if (agentData != null)
                 {
                     Utils.WriteLog($"Agent {agentUrl} already exists.", "info");
                 }
@@ -406,8 +421,15 @@ namespace Console
                 {
                     string[] urlStrings = agentUrl.Split(':');
                     Utils.WriteLog($"Adding agent {agentUrl} to pool.", "info");
-                    _agents.Add(new Agent(urlStrings[0], int.Parse(urlStrings[1]), false));
-                    Utils.WriteLog($"Agents count: {_agents.Count}.", "info");
+
+                    _agentsData.Add(new AgentData()
+                        {
+                            URL = agentUrl,
+                            Status = AgentStatus.INIT.ToString()
+                        }
+                    );
+
+                    Utils.WriteLog($"Agents count: {_agentsData.Count}.", "info");
                     
                 }
 
@@ -447,7 +469,7 @@ namespace Console
 
                 Utils.WriteLog($"Received agent ready from {url}.", "info");
 
-                Agent agent = _agents.Find(a => a.URL == url);
+                AgentData agent = _agentsData.Find(a => a.URL == url);
                 if (agent == null)
                 {
                     Utils.WriteLog($"Agent {url} does not exist", "error");
@@ -456,11 +478,26 @@ namespace Console
                 
                 agent.IsReady = true;
 
-                bool allAgentsAreReady = _agents.All(a => a.IsReady);
+                bool allAgentsAreReady = _agentsData.All(a => a.IsReady);
 
                 if (allAgentsAreReady)
                 {
-                   StartSendingScript();
+                    _agentsData = Utils.ReadAgentsFromFile(Settings["AGENTS_PATH"]);
+
+                    ScriptsData scriptsData = null;
+                    using (StreamReader reader = new StreamReader(Settings["ACTIVATION_SCRIPT_PATH"]))
+                    {
+                        string json = reader.ReadToEnd();
+                        scriptsData = JsonConvert.DeserializeObject<ScriptsData>(json);
+                    }
+
+                    var numRepeats = scriptsData.Tests.Where(s => s.Label == "Events").FirstOrDefault().NumRepeats;
+                    foreach (var agentData in _agentsData)
+                    {
+                        agentData.TotalEvents = numRepeats;
+                    }
+
+                    StartSendingScript();
                    var stopAWSServices = bool.Parse(Settings["SCENARIO_STOP_AWS"]);
 
                    if (stopAWSServices)
@@ -555,11 +592,14 @@ namespace Console
             try
             {
 
-                var stageData = new StageData();
-                stageData.Stage = Stage.GET_RESULTS.ToString();
-                stageData.StageIdx = Stage.GET_RESULTS;
-                stageData.Time = DateTime.Now;
-                TriggerStageDataUpdate(stageData);
+                if (_stageData.StageIdx < Stage.GET_RESULTS)
+                {
+                    _stageData.Stage = Stage.GET_RESULTS.ToString();
+                    _stageData.StageIdx = Stage.GET_RESULTS;
+                    _stageData.Time = DateTime.Now;
+                    TriggerStageDataUpdate(_stageData);
+                }
+
 
                 if (Settings["MODE"].ToLower() == "debug")
                 {
@@ -601,9 +641,18 @@ namespace Console
 
                 _devices.Where(d => d.DeviceType == ga && d.DeviceSerialNumber == sn).FirstOrDefault().Finished = true;
 
-                var stData = new StageData();
-                stData.DevicesNumberFinished = _devices.Where(d => d.Finished == true).Count();
-                TriggerStageDataUpdate(stData);
+                _stageData.DevicesNumberFinished = _devices.Where(d => d.Finished == true).Count();
+                TriggerStageDataUpdate(_stageData);
+
+                var eventsNumberForDevice = GetEventsNumberForDevice(sn, ga);
+                var agentData = _agentsData.Where(a => a.URL.Contains(url)).FirstOrDefault();
+
+                var deviceData = agentData.Devices.Where(d => d.DeviceType == ga && d.DeviceSerialNumber == sn).FirstOrDefault();
+                deviceData.Finished = true;
+                deviceData.EventsInRDS = eventsNumberForDevice;
+
+                TriggerAgentDataUpdate(agentData);
+
             }
             catch (Exception ex)
             {
@@ -618,12 +667,11 @@ namespace Console
                     _getAWSResourcesTimer.Stop();
                     Utils.WriteLog($"Stopping AWS resources timer", "info");
 
-                    var stageData = new StageData();
-                    stageData.Stage = Stage.FINISHED.ToString();
-                    stageData.StageIdx = Stage.FINISHED;
-                    stageData.Time = DateTime.Now;
-                    stageData.DevicesNumberFinished = _devices.Count;
-                    TriggerStageDataUpdate(stageData);
+                    _stageData.Stage = Stage.FINISHED.ToString();
+                    _stageData.StageIdx = Stage.FINISHED;
+                    _stageData.Time = DateTime.Now;
+                    _stageData.DevicesNumberFinished = _devices.Count;
+                    TriggerStageDataUpdate(_stageData);
                 }
             }
         }
@@ -634,7 +682,7 @@ namespace Console
         /// <param name="url">agent url</param>
         /// <param name="content">Response content</param>
         /// <returns>true/false if operation succeeds</returns>
-        public async Task GetScriptLog(string url, string jsonContent)
+        public async Task GetScriptLog(string url, ScriptLog scriptLogObj)
         {
             
             try
@@ -651,7 +699,6 @@ namespace Console
                     Directory.CreateDirectory(deviceLogsDir);
                 }
 
-                ScriptLog scriptLogObj = JsonConvert.DeserializeObject<ScriptLog>(jsonContent);
                 string deviceName = scriptLogObj.DeviceName;
                 string logContent = scriptLogObj.Content;
 
@@ -666,6 +713,12 @@ namespace Console
 
                 var deviceType = deviceName.Split('_')[1];
                 var deviceSerialNumber = deviceName.Split('_')[0];
+
+                var agentData = _agentsData.Where(a => a.URL == url).FirstOrDefault();
+                var device = agentData.Devices.Where(d => d.DeviceSerialNumber == deviceSerialNumber && d.DeviceType == deviceType).FirstOrDefault();
+                device.Success = false;
+
+                TriggerAgentDataUpdate(agentData);
                 
             }
             catch (Exception ex)
@@ -680,8 +733,23 @@ namespace Console
 
         public List<string> GetAgents()
         {
-            List<string> agentUrls = (from agent in _agents select agent.URL).ToList();
+            List<string> agentUrls = (from agent in _agentsData select agent.URL).ToList();
             return agentUrls;
+        }
+
+        public string GetScriptLog(string device)
+        {
+            string result = string.Empty;
+
+            string deviceLogsDir = Settings["DEVICE_LOGS_DIR"];
+            string logFilePath = Path.Combine(deviceLogsDir, string.Concat(device,"_log.txt"));
+
+            if (File.Exists(logFilePath))
+            {
+                result = File.ReadAllText(logFilePath).Replace(Environment.NewLine, "<br>").Replace("\n", "<br>").Replace("\r", "<br>");
+            }
+
+            return result;
         }
 
 
@@ -726,8 +794,7 @@ namespace Console
             try
             {
                 Utils.WriteLog($"-----DISTRIBUTE STAGE BEGIN-----", "info");
-                int returnCode = Utils.RunCommand(Settings["PYTHON"], "distribute_devices.py", $"{Settings["CONFIG_FILE"]}", Settings["PYTHON_SCRIPTS_PATH"], Settings["OUTPUT"]);
-                
+                int returnCode = Utils.RunCommand(Settings["PYTHON"], "distribute_devices.py", $"{Settings["CONFIG_FILE"]}", Settings["PYTHON_SCRIPTS_PATH"], Settings["OUTPUT"]);                
             }
             catch (Exception ex)
             {
@@ -799,6 +866,7 @@ namespace Console
         {
             try
             {
+
                 Utils.WriteLog("-----SEND SCRIPT STAGE BEGIN-----", "info");
                 Utils.WriteLog("Send automation script to agents.", "info");
                 int returnCode = Utils.RunCommand(Settings["PYTHON"], "send_script.py", $"{Settings["CONFIG_FILE"]}", Settings["PYTHON_SCRIPTS_PATH"], Settings["OUTPUT"]);
@@ -811,11 +879,11 @@ namespace Console
             finally
             {
                 Utils.WriteLog("-----SEND SCRIPT STAGE END-----", "info");
-                var stageData = new StageData();
-                stageData.Stage = Stage.RUN_DEVICES.ToString();
-                stageData.StageIdx = Stage.RUN_DEVICES;
-                stageData.Time = DateTime.Now;
-                TriggerStageDataUpdate(stageData);
+
+                _stageData.Stage = Stage.RUN_DEVICES.ToString();
+                _stageData.StageIdx = Stage.RUN_DEVICES;
+                _stageData.Time = DateTime.Now;
+                TriggerStageDataUpdate(_stageData);
             }
         }
 
@@ -999,12 +1067,55 @@ namespace Console
 
                 TriggerAwsDataUpdate(awsData);
 
+                if (_agentsData.Count() != 0)
+                {
+                    GetAgentsData();
+
+                    foreach (var agentData in _agentsData)
+                    {
+                        TriggerAgentDataUpdate(agentData);
+                    }
+                }
+                
+
                 Utils.WriteLog("---------------------------------------------------------------", "info");
 
             }
             catch (Exception ex)
             {
                 Utils.WriteLog($"Error in GetAWSMetrics: {ex.Message} {ex.StackTrace}", "error");
+            }
+
+        }
+
+        private void GetAgentsData()
+        {
+            var client = _clientFactory.CreateClient();
+            
+            foreach (var agent in _agentsData)
+            {
+                var request = new HttpRequestMessage(HttpMethod.Get, "http://" + agent.URL + "/getAgentData");
+                
+                try
+                {
+                    var response = client.SendAsync(request).Result;
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        var responseString = response.Content.ReadAsStringAsync().Result;
+
+                        var agentDataUpdate = JsonConvert.DeserializeObject<AgentData>(responseString);
+                        var agentData = _agentsData.Where(a => a.URL == agent.URL).FirstOrDefault();
+                        agentData.ClientsNumber = agentDataUpdate.ClientsNumber;
+                        agentData.ServersNumber = agentDataUpdate.ServersNumber;
+                        agentData.Status = agentDataUpdate.Status;
+                    }
+                }
+                catch (HttpRequestException httpRequestException)
+                {
+                    Utils.WriteLog(httpRequestException.Message, "error");
+                    Utils.WriteLog(httpRequestException.StackTrace, "error");
+                }
             }
 
         }
@@ -1038,48 +1149,59 @@ namespace Console
 
         }
 
+        private int GetEventsNumberForDevice(string deviceSerialNumber, string deviceType)
+        {
+            int eventsCount = 0;
+
+            var apiEventHost = Settings["API_PROCESSING_URL"];
+            var today = DateTime.Now.ToString("yyyy-MM-dd");
+            var yesterday = DateTime.Now.AddDays(-1).ToString("yyyy-MM-dd");
+
+            var apiEventUrl = $"{apiEventHost}/events?deviceSerialNumber={deviceSerialNumber}&deviceType={deviceType}&from={yesterday}T00:00:00.015Z&to={today}T23:59:59.015Z";
+
+            var requestMessage = new HttpRequestMessage
+            {
+                Method = HttpMethod.Get,
+                RequestUri = new Uri(apiEventUrl)
+            };
+
+            requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", Settings["ACCESS_TOKEN"]);
+
+            var client = _clientFactory.CreateClient();
+            var response = client.SendAsync(requestMessage).Result;
+
+            if (response.IsSuccessStatusCode)
+            {
+                var responseContent = response.Content;
+
+                // by calling .Result you are synchronously reading the result
+                string responseString = responseContent.ReadAsStringAsync().Result;
+                var obj = JObject.Parse(responseString);
+
+                eventsCount = ((JArray)obj["data"]).Count;
+            }
+
+            return eventsCount;
+        }
+
         private int GetEventsNumber()
         {
             int result = 0;
-            foreach (var device in _devices)
+            LumenisAuthenticate();
+
+            foreach (var agentData in _agentsData)
             {
-                var eventsCount = 0;
-                string deviceType = device.DeviceType;
-                string deviceSerialNumber = device.DeviceSerialNumber;
-
-                LumenisAuthenticate();
-
-                var apiEventHost = Settings["API_PROCESSING_URL"];
-                var today = DateTime.Now.ToString("yyyy-MM-dd");
-                var yesterday = DateTime.Now.AddDays(-1).ToString("yyyy-MM-dd");
-
-                var apiEventUrl = $"{apiEventHost}/events?deviceSerialNumber={deviceSerialNumber}&deviceType={deviceType}&from={yesterday}T00:00:00.015Z&to={today}T23:59:59.015Z";
-
-                var requestMessage = new HttpRequestMessage
+                foreach (var device in agentData.Devices)
                 {
-                    Method = HttpMethod.Get,
-                    RequestUri = new Uri(apiEventUrl)
-                };
+                    string deviceType = device.DeviceType;
+                    string deviceSerialNumber = device.DeviceSerialNumber;
 
-                requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", Settings["ACCESS_TOKEN"]);
+                    device.EventsInRDS = GetEventsNumberForDevice(deviceSerialNumber, deviceType);
 
-                var client = _clientFactory.CreateClient();
-                var response = client.SendAsync(requestMessage).Result;
-
-                if (response.IsSuccessStatusCode)
-                {
-                    var responseContent = response.Content;
-
-                    // by calling .Result you are synchronously reading the result
-                    string responseString = responseContent.ReadAsStringAsync().Result;
-                    var obj = JObject.Parse(responseString);
-
-                    eventsCount = ((JArray)obj["data"]).Count;
+                    result += device.EventsInRDS;
                 }
-
-                result += eventsCount;
             }
-
+            
             return result;
         }
 
@@ -1088,8 +1210,8 @@ namespace Console
         /// </summary>
         public void Reset()
         {
-            
-            _agents.Clear();
+
+            _agentsData.Clear();
             string agentsPath = Settings["AGENTS_PATH"];
             string outputPath = Settings["OUTPUT"];
             

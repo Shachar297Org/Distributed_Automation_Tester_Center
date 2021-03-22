@@ -8,12 +8,6 @@ using TestCenterConsole.Models;
 
 namespace TestCenter.ViewModels
 {
-    public enum AgentStatus
-    {
-        LIVE,
-        OFFLINE,
-        RUNNING
-    }
 
     public enum ScenarioStatus
     {
@@ -70,6 +64,14 @@ namespace TestCenter.ViewModels
         public string AgentDirPath { get; set; }
 
         public AgentStatus Status { get; set; }
+
+        public string URL 
+        {
+            get
+            {
+                return string.Join(":", IPAddress, Port);
+            }
+        }
 
     }
 

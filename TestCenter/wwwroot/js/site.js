@@ -83,7 +83,7 @@ var options = {
             text: 'Load Percent %'
         },
         min: 0,
-        max: 100
+        max: 120
     },
     legend: {
         position: 'top',
@@ -248,7 +248,9 @@ connection.on('awsData', function (message) {
         }
     });
 
-    updateChartData(message, num);
+    if (message.cpuUtilization != null) {
+        updateChartData(message, num);
+    }
 
     $('#eventsInRds').text(message.eventsInRDS);
 
@@ -257,7 +259,7 @@ connection.on('awsData', function (message) {
 connection.on('stageData', function (message) {
 
     $('#stage').text(message.stage);
-    $('#devicesFinished').text(message.devicesNumberFinished)
+    $('#devicesFinished').text(message.devicesNumberFinished);
 
     if (!chartExists && message.time != undefined) {
         var time = getHHmm(message.time);
@@ -274,6 +276,20 @@ connection.on('stageData', function (message) {
         $(selector).addClass('active');
     }
 
+
+});
+
+connection.on('agentsData', function (agentsData) {
+
+    for (var i = 0; i < agentsData.length; i++) {
+        var agentClass = '.agent-' + i;
+        $(agentClass + " #agentClientsRunning").text(agentsData[i].clientsNumber);
+        $(agentClass + " #agentsServersRunning").text(agentsData[i].serversNumber);
+        $(agentClass + " #agentStatus").text(agentsData[i].status);
+
+        $(agentClass + " #agentDevicesNumber").text(agentsData[i].devices.length);    
+
+    }
 
 });
 
@@ -295,12 +311,18 @@ $(document).ready(function () {
     var awsData = model.progressData.awsMetricsData;
     for (var i = 0; i < awsData.length; i++) {
         updateChartData(awsData[i], 0);        
-    }    
+    } 
+
+    
 
     $('#startScenario').on('click', function () {        
 
         var scenarioName = $(this).closest('tr').find(".scenarioName").text();
         $('#progressScenarioName').text(scenarioName);
+
+        $(this).closest('tr').find(".scenarioStatus").text('EXECUTING');
+        $('#progressScenarioName').text(scenarioName);
+
         var sid = $("#scenarios tr").index($(this).closest('tr')) - 1; // table row ID 
         $.get("/ui/StartScenario/" + sid);
     });

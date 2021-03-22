@@ -15,7 +15,7 @@ namespace Console.Interfaces
 
         Task<bool> AgentReady(string url);
 
-        Task GetScriptLog(string url, string jsonContent);
+        Task GetScriptLog(string url, ScriptLog scriptLogObj);
 
         Task GetComparisonResults(string url, string jsonContent);
 
@@ -25,6 +25,7 @@ namespace Console.Interfaces
 
         event EventHandler<AwsMetricsData> AwsDataUpdated;
         event EventHandler<StageData> StageDataUpdated;
+        event EventHandler<AgentData> AgentDataUpdated;
 
         List<string> GetAgents();
         
@@ -32,6 +33,8 @@ namespace Console.Interfaces
         void UpdateCenterSettings(TestCenterSettings settings);
 
         void Reset();
+
+        string GetScriptLog(string deviceName);
 
     }
 }

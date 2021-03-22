@@ -4,7 +4,7 @@ def SendScriptToAgent(agentRec: dict, scriptContent: str, delayBeforeStoppingSer
     print(
         'Sending activation script to agent {}'.format(agentRec['URL']), 'info')
     r = requests.post(
-        url='http://{}:{}/sendScript'.format(agentRec['AgentIP'], agentRec['AgentPort']), json={'Type': 'txt', 'Content': scriptContent, 'StoppingDelay' : delayBeforeStoppingServer})
+        url='http://{}/sendScript'.format(agentRec['URL']), json={'Type': 'txt', 'Content': scriptContent, 'StoppingDelay' : delayBeforeStoppingServer})
     if r.status_code == 200:
         print('Script was recieved at agent {}'.format(
             agentRec['URL']), 'info')

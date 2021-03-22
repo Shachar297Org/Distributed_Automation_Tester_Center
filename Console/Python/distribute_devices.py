@@ -5,21 +5,23 @@ def DivideDevicesAmongAgents(deviceRecords, agentRecords):
     Divide devices list among the connected agents in Round-Robin manner
     """
     for agentRec in agentRecords:
-        agentRec['devicesList'] = []
+        agentRec['Devices'] = []
 
+    
     agentIndex = 0
+    
     for deviceRec in deviceRecords:
-        agentRecords[agentIndex]['devicesList'].append(deviceRec)
+        agentRecords[agentIndex]['Devices'].append(deviceRec)
         agentIndex = (agentIndex + 1) % len(agentRecords)
 
 def SendDevice(agentRec):
-    r = requests.post('http://{}:{}/sendDevices'.format(
-            agentRec['AgentIP'], agentRec['AgentPort']), json=agentRec['devicesList'])
-    
+    print(agentRec['Devices'])
+    r = requests.post('http://{}/sendDevices'.format(
+            agentRec['URL']), json=agentRec['Devices'])
+            
     print('Send json file of devices to agent in url {}'.format(agentRec['URL']))
-    print('Request url: {}:{}'.format(
-        agentRec['AgentIP'], agentRec['AgentPort']))
-    print('Send devices: {}'.format(agentRec['devicesList']))
+    print('Request url: {}'.format(agentRec['URL']))
+    print('Send devices: {}'.format(agentRec['Devices']))
 
     if r.status_code == 200:
         print(
@@ -27,7 +29,7 @@ def SendDevice(agentRec):
     else:
         print('Error occured: {}'.format(r))    
 
-def DistributeDevices(deviceRecords, agentRecords):
+def DistributeDevices(agentsJsonFile, deviceRecords, agentRecords):
     """
     Send to every connected agent a list of devices in json format
     """
@@ -35,6 +37,9 @@ def DistributeDevices(deviceRecords, agentRecords):
 
     print('Divide devices among agents.')
     DivideDevicesAmongAgents(deviceRecords, agentRecords)
+    
+    agentDevices = json.dumps(agentRecords)
+    WriteContentToFile(agentsJsonFile, agentDevices)
 
     res = Parallel(n_jobs=len(agentRecords))(delayed(SendDevice)(agentRec) for agentRec in agentRecords)
 
@@ -83,9 +88,11 @@ if __name__ == "__main__":
         agentRecords = ReadRecordsFromJsonFile(agentsJsonFile)
 
         print('Distribute devices to agents')
-        DistributeDevices(deviceRecords, agentRecords)
+        DistributeDevices(agentsJsonFile, deviceRecords, agentRecords)
 
         print('-----success-----')
+
+        #return agentRecords
 
     except Exception as ex:
         print('Error: {}'.format(ex))

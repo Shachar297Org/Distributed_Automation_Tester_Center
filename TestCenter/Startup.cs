@@ -13,6 +13,8 @@ using System.Net;
 using System.Net.Http;
 using TestCenter.Hubs;
 using TestCenter.LiteDb;
+using TestCenterConsole.Utilities;
+using Newtonsoft.Json;
 
 namespace TestCenter
 {
@@ -29,6 +31,7 @@ namespace TestCenter
         public void ConfigureServices(IServiceCollection services)
         {
             services.AddControllersWithViews();
+            
             services.AddSignalR();
 
             services.AddHttpClient();

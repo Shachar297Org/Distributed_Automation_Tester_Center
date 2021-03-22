@@ -6,16 +6,34 @@ using TestCenterConsole.Models;
 
 namespace TestCenterConsole.Models
 {
-    public class AgentMeasurementsData
+    public enum AgentStatus
     {
-        public string AgentName { get; set; }
+        LIVE,
+        OFFLINE,
+        INIT,
+        CREATING_DEVICE_FOLDERS,
+        RUNNING,
+        FINISHED
+    }
 
-        public int ClientsRunnng { get; set; }
+    public class AgentData
+    {
+        public AgentData()
+        {
+            Devices = new List<LumenisXDevice>();
+        }
 
-        public int ServersRunning { get; set; }
+        public int ServersNumber { get; set; }
+        public int ClientsNumber { get; set; }
 
-        public Stage Stage { get; set; }
+        public List<LumenisXDevice> Devices { get; set; }
+        
+        public string Status { get; set; }
 
+        public string URL { get; set; }
+        public int TotalEvents { get; set; }
+
+        public bool IsReady { get; set; }
     }
 
     public class AwsMetricsData
@@ -32,7 +50,7 @@ namespace TestCenterConsole.Models
     {
         public ProgressData(string scenarioName="-", int numDevices = 0)
         {
-            AgentsData = new List<AgentMeasurementsData>();
+            AgentsData = new List<AgentData>();
             AwsMetricsData = new List<AwsMetricsData>();
             ScenarioName = scenarioName;
             StageData = new List<StageData>
@@ -45,7 +63,7 @@ namespace TestCenterConsole.Models
             };
         }
 
-        public List<AgentMeasurementsData> AgentsData { get; set; }
+        public List<AgentData> AgentsData { get; set; }
 
         public List<AwsMetricsData> AwsMetricsData { get; set; }
 
