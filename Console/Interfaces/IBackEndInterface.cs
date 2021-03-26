@@ -33,6 +33,7 @@ namespace Console.Interfaces
         void UpdateCenterSettings(TestCenterSettings settings);
 
         void Reset();
+        void Stop();
 
         string GetScriptLog(string deviceName);
 

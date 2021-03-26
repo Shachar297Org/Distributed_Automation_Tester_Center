@@ -23,11 +23,11 @@
                         </a>
 
                         <div class="dropdown-menu dropdown-menu-right">
-                            <a class="dropdown-item" href="#">Action</a>
-                            <a class="dropdown-item" href="#">Another action</a>
-                            <a class="dropdown-item" href="#">Something else here</a>
+                            <a class="dropdown-item" href="javascript:void(0);">Action</a>
+                            <a class="dropdown-item" href="javascript:void(0);">Another action</a>
+                            <a class="dropdown-item" href="javascript:void(0);">Something else here</a>
                             <div class="dropdown-divider"></div>
-                            <a class="dropdown-item" href="#">Separated link</a>
+                            <a class="dropdown-item" href="javascript:void(0);">Separated link</a>
                         </div>
                     </div>
                 </div>
@@ -164,6 +164,35 @@
     <div class="col-xl-6">
         <div class="card">
             <div class="card-body">
+                <div class="row mb-lg-4">
+
+                    <div class="col-lg-6">
+                        <div class="card mini-stats-wid">
+                            <div class="card-body">
+                                <div class="media">
+                                    <div class="media-body text-center">
+                                        <button type="button" class="ml-auto btn btn-outline-danger waves-effect" id="stopExecution">Stop Execution</button>
+                                    </div>
+
+                               </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-lg-6">
+                        <div class="card mini-stats-wid">
+                            <div class="card-body">
+                                <div class="media">
+                                    <div class="media-body text-center">
+                                        <a href=@Url.Action("Results", "UI") target="_blank" class="ml-auto btn btn-outline-secondary waves-effect" id="viewResults">View Results</a>
+                                    </div>
+
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="row mb-lg-4">
 
                     <div class="col-lg-6">
@@ -321,11 +350,11 @@
                             <div class="clearfix  mt-4 mt-lg-0">
                                 <div class="dropdown float-right">
 
-                                    <a href="#" class="dropdown-toggle card-drop" data-toggle="dropdown" aria-expanded="false">
+                                    <a href="javascript:void(0);" class="dropdown-toggle card-drop" data-toggle="dropdown" aria-expanded="false">
                                         <i class="mdi mdi-dots-horizontal font-size-18"></i>
                                     </a>
                                     <div class="dropdown-menu dropdown-menu-right">
-                                        <a class="dropdown-item text-secondary" href="#">Stop processing</a>
+                                        <a class="dropdown-item text-secondary" href="javascript:void(0);">Stop processing</a>
                                     </div>
 
                                 </div>

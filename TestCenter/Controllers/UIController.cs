@@ -80,10 +80,36 @@ namespace TestCenterApp.Controllers
 
         private void UpdateAwsDataUI(object sender, AwsMetricsData measurementData)
         {
-            var awsDataPred = _model.ProgressData.AwsMetricsData.Where(d => d.CPUUtilization[0].Time.Equals(measurementData.CPUUtilization[0].Time));
+            var msmtIndex = measurementData.CPUUtilization.ToList().FindIndex(data => data != null);
+            if (msmtIndex == -1)
+            {
+                return;
+            }            
+
+            var awsDataPred = _model.ProgressData.AwsMetricsData.Where(d => d.CPUUtilization[msmtIndex].Time.Equals(measurementData.CPUUtilization[msmtIndex].Time));
             
             if (awsDataPred.Count() == 0)
             {
+                if (_model.ProgressData.AwsMetricsData.Count > 0)
+                {
+                    var lastData = _model.ProgressData.AwsMetricsData.Last();
+                    for (int i = 0; i < measurementData.CPUUtilization.Length; i++)
+                    {
+                        if (measurementData.CPUUtilization[i] == null)
+                        {
+                            measurementData.CPUUtilization[i] = lastData.CPUUtilization[i];
+                            measurementData.CPUUtilization[i].Time = measurementData.CPUUtilization[msmtIndex].Time;
+                        }
+
+                        if (measurementData.MemoryUtilization[i] == null)
+                        {
+                            measurementData.MemoryUtilization[i] = lastData.MemoryUtilization[i];
+                            measurementData.MemoryUtilization[i].Time = measurementData.MemoryUtilization[msmtIndex].Time;
+                        }
+                    }
+                }
+                
+
                 _model.ProgressData.AwsMetricsData.Add(measurementData);
                 _hub.Clients.All.SendAsync("awsData", measurementData);
             }            
@@ -92,7 +118,7 @@ namespace TestCenterApp.Controllers
                 var awsData = new AwsMetricsData();
                 awsData.EventsInRDS = measurementData.EventsInRDS;
 
-                var awsDataModel = awsDataPred.FirstOrDefault();
+                var awsDataModel = awsDataPred.LastOrDefault();
                 awsDataModel.EventsInRDS = measurementData.EventsInRDS;
 
                 _hub.Clients.All.SendAsync("awsData", awsData);
@@ -101,15 +127,7 @@ namespace TestCenterApp.Controllers
 
         private void UpdateStageDataUI(object sender, StageData stageData)
         {
-            //var stagePred = _model.ProgressData.StageData.Where(s => s.Stage == stageData.Stage);
-            //if (stagePred.Count() == 0)
-            {
-                _model.ProgressData.StageData.Add(stageData);
-            }
-            //else
-            //{
-            //    stagePred.FirstOrDefault().DevicesNumberFinished = stageData.DevicesNumberFinished;
-            //}
+            _model.ProgressData.StageData.Add(stageData);
 
             _hub.Clients.All.SendAsync("stageData", stageData);
         }
@@ -136,7 +154,7 @@ namespace TestCenterApp.Controllers
         {
             _backEnd.UpdateCenterSettings(settings);
 
-            return RedirectToAction("index");
+            return RedirectToAction("Index");
 
         }
 
@@ -195,7 +213,7 @@ namespace TestCenterApp.Controllers
                 }                
             }            
 
-            return RedirectToAction("index");
+            return RedirectToAction("Index");
         }
 
         public IActionResult ShowAddScenario(int? id)
@@ -256,7 +274,7 @@ namespace TestCenterApp.Controllers
             
             _backEnd.UpdateScenarioSettings(scenario);
 
-            return RedirectToAction("index");
+            return RedirectToAction("Index");
 
         }
 
@@ -291,8 +309,23 @@ namespace TestCenterApp.Controllers
             return agent;
         }
 
-        public async Task<IActionResult> StopScenario()
+        
+        public async Task<IActionResult> StopScenario([FromQuery]string action)
         {
+            _model.Scenarios.Where(sc => sc.Status == ScenarioStatus.EXECUTING).FirstOrDefault().Status = ScenarioStatus.FINISHED;
+
+            
+            foreach (var agentProgress in _model.ProgressData.AgentsData)
+            {
+                agentProgress.Status = AgentStatus.FINISHED.ToString();
+                foreach (var device in agentProgress.Devices)
+                {
+                    device.Finished = true;
+                }
+                
+            }
+            _backEnd.Stop();
+
 
             foreach (var agent in _model.Agents)
             {
@@ -324,7 +357,7 @@ namespace TestCenterApp.Controllers
                 }
             }
 
-            return RedirectToAction("index");
+            return RedirectToAction(action);
         }
 
 
@@ -375,7 +408,7 @@ namespace TestCenterApp.Controllers
 
             }
 
-            return await Task.Run<ActionResult>(() => { return RedirectToAction("index"); });
+            return await Task.Run<ActionResult>(() => { return RedirectToAction("Index"); });
             
         }
 
@@ -388,6 +421,14 @@ namespace TestCenterApp.Controllers
         public IActionResult Results()
         {
             return View("Results", _model);
+        }
+
+        public IActionResult Reset()
+        {
+            _model = new TestCenterViewModel();
+
+            return View("Index", _model);
+
         }
 
     }

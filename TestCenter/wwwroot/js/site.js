@@ -261,7 +261,12 @@ connection.on('stageData', function (message) {
     $('#stage').text(message.stage);
     $('#devicesFinished').text(message.devicesNumberFinished);
 
-    if (!chartExists && message.time != undefined) {
+    if (!chartExists && message.time != undefined && message.time != null) {
+        dateToCheck = new Date(message.time)
+        if (dateToCheck.getFullYear() == 1 && message.stage == 'GET_RESULTS') {
+            return;
+        }
+
         var time = getHHmm(message.time);
 
         var textSelector = '#timeBlock' + message.stageIdx + ' #stageTime';
@@ -313,8 +318,16 @@ $(document).ready(function () {
         updateChartData(awsData[i], 0);        
     } 
 
-    
+    $('#resetCenter').on('click', function () {
 
+        $.get("/ui/Reset/",
+            function (data) {
+                window.location.reload(true);
+            });
+        
+    });
+
+    
     $('#startScenario').on('click', function () {        
 
         var scenarioName = $(this).closest('tr').find(".scenarioName").text();
@@ -325,13 +338,27 @@ $(document).ready(function () {
 
         var sid = $("#scenarios tr").index($(this).closest('tr')) - 1; // table row ID 
         $.get("/ui/StartScenario/" + sid);
+
+        //window.location.reload(true);
     });
 
     $('#stopScenario').on('click', function () {
 
         var sid = $("#scenarios tr").index($(this).closest('tr')) - 1; // table row ID
-        $.get("/ui/StopScenario/" + sid);
+        $.get("/ui/StopScenario",
+            function (data) {
+                window.location.reload(true);
+            });       
+    }); 
 
+    $('#stopExecution').on('click', function () {
+
+        var sid = $("#scenarios tr").index($(this).closest('tr')) - 1; // table row ID
+        $.get("/ui/StopScenario?action=Progress",
+            function (data) {
+                window.location.reload(true);
+            });
+        
     });
 
     $('#center').on('click', function () {

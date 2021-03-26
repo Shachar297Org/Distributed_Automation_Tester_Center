@@ -642,7 +642,12 @@ namespace Console
                 _devices.Where(d => d.DeviceType == ga && d.DeviceSerialNumber == sn).FirstOrDefault().Finished = true;
 
                 _stageData.DevicesNumberFinished = _devices.Where(d => d.Finished == true).Count();
-                TriggerStageDataUpdate(_stageData);
+                
+                var stageData = new StageData();
+                stageData.Stage = _stageData.Stage;
+                stageData.StageIdx = _stageData.StageIdx;
+                stageData.DevicesNumberFinished = _stageData.DevicesNumberFinished;
+                TriggerStageDataUpdate(stageData);
 
                 var eventsNumberForDevice = GetEventsNumberForDevice(sn, ga);
                 var agentData = _agentsData.Where(a => a.URL.Contains(url)).FirstOrDefault();
@@ -662,7 +667,7 @@ namespace Console
             {
                 Utils.WriteLog($"-----GET COMPARE RESULTS FOR {eventsLog.DeviceName} END-----", "info");
 
-                if (_devices.Where(d => d.Finished == false).Count() == 0)
+                if (_devices.Count(d => d.Finished == false) == 0)
                 {
                     _getAWSResourcesTimer.Stop();
                     Utils.WriteLog($"Stopping AWS resources timer", "info");
@@ -1211,7 +1216,13 @@ namespace Console
         public void Reset()
         {
 
+            Stop();
+
             _agentsData.Clear();
+            _devices.Clear();
+
+            _stageData = new StageData();
+
             string agentsPath = Settings["AGENTS_PATH"];
             string outputPath = Settings["OUTPUT"];
             
@@ -1272,6 +1283,23 @@ namespace Console
             {
                 File.Delete(returnFilePath);
             }
+        }
+
+        public void Stop()
+        {
+            _getAWSResourcesTimer.Stop();
+            Utils.WriteLog($"Stopped AWS resources timer", "info");
+
+            var finish = (int)Stage.FINISHED;
+
+            for (int i = (int)_stageData.StageIdx + 1; i <= finish; i++)
+            {
+                _stageData.Stage = ((Stage)i).ToString();
+                _stageData.StageIdx = (Stage)i;
+                _stageData.Time = DateTime.Now;
+                TriggerStageDataUpdate(_stageData);
+            }
+            
         }
     }
 }
