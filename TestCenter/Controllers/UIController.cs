@@ -24,7 +24,7 @@ namespace TestCenterApp.Controllers
     {
         private readonly IHttpClientFactory _clientFactory;
 
-        private IBackEndInterface _backEnd;
+        private ILoadTester _loadTester;
         private Settings _settings;
 
         private static bool _subscribed = false;
@@ -34,21 +34,21 @@ namespace TestCenterApp.Controllers
 
         private IHubContext<TestCenterHub> _hub;
 
-        public UIController(IBackEndInterface backEnd, 
+        public UIController(ILoadTester backEnd, 
                             Settings settings, 
                             IHubContext<TestCenterHub> hub,
                             IHttpClientFactory clientFactory)
         {
             _clientFactory = clientFactory;
-            _backEnd = backEnd;
+            _loadTester = backEnd;
             _settings = settings;
             _hub = hub;
 
             if (!_subscribed)
             {
-                _backEnd.AwsDataUpdated += UpdateAwsDataUI;
-                _backEnd.StageDataUpdated += UpdateStageDataUI;
-                _backEnd.AgentDataUpdated += UpdateAgentDataUI;
+                _loadTester.AwsDataUpdated += UpdateAwsDataUI;
+                _loadTester.StageDataUpdated += UpdateStageDataUI;
+                _loadTester.AgentDataUpdated += UpdateAgentDataUI;
 
                 _subscribed = true;
             }
@@ -127,7 +127,14 @@ namespace TestCenterApp.Controllers
 
         private void UpdateStageDataUI(object sender, StageData stageData)
         {
-            _model.ProgressData.StageData.Add(stageData);
+            if (stageData.IsNewStage)
+            {
+                _model.ProgressData.StageData.Add(stageData);
+            }
+            else
+            {
+                _model.ProgressData.StageData.Last().DevicesNumberFinished = stageData.DevicesNumberFinished;                
+            }
 
             _hub.Clients.All.SendAsync("stageData", stageData);
         }
@@ -152,7 +159,7 @@ namespace TestCenterApp.Controllers
         [HttpPost]
         public ActionResult SetSettings([FromForm] TestCenterSettings settings)
         {
-            _backEnd.UpdateCenterSettings(settings);
+            _loadTester.UpdateCenterSettings(settings);
 
             return RedirectToAction("Index");
 
@@ -172,7 +179,7 @@ namespace TestCenterApp.Controllers
 
         public IActionResult GetScriptLog(string device)
         {
-            var scriptLog = _backEnd.GetScriptLog(device);
+            var scriptLog = _loadTester.GetScriptLog(device);
 
             return Ok(scriptLog);
         }
@@ -272,7 +279,7 @@ namespace TestCenterApp.Controllers
             scenario.Services = scenarioVM.Services;
             scenario.StopAws = scenarioVM.StopAws;
             
-            _backEnd.UpdateScenarioSettings(scenario);
+            _loadTester.UpdateScenarioSettings(scenario);
 
             return RedirectToAction("Index");
 
@@ -322,9 +329,10 @@ namespace TestCenterApp.Controllers
                 {
                     device.Finished = true;
                 }
-                
+                agentProgress.ClientsNumber = 0;
+                agentProgress.ServersNumber = 0;
             }
-            _backEnd.Stop();
+            _loadTester.Stop();
 
 
             foreach (var agent in _model.Agents)
@@ -357,7 +365,7 @@ namespace TestCenterApp.Controllers
                 }
             }
 
-            return RedirectToAction(action);
+            return Ok();
         }
 
 
@@ -408,7 +416,7 @@ namespace TestCenterApp.Controllers
 
             }
 
-            return await Task.Run<ActionResult>(() => { return RedirectToAction("Index"); });
+            return await Task.Run<ActionResult>(() => { return Ok(); });
             
         }
 

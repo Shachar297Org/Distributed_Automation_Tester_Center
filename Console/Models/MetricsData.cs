@@ -84,6 +84,8 @@ namespace TestCenterConsole.Models
         public int DevicesNumberFinished { get; set; }
 
         public DateTime Time { get; set; }
+
+        public bool IsNewStage { get; set; }
     }
 
     public class AWSData

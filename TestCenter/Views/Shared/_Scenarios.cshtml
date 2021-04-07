@@ -1,70 +1,75 @@
 ﻿@model IEnumerable<TestCenter.ViewModels.ScenarioViewModel>
 
-
-<div class="col-lg-12">
-    <div class="page-title-box d-flex align-items-center">
-        <div>
-            <h4 class="mb-0 font-size-18">SCENARIOS</h4>
-        </div>
-        <div class="ml-auto">
-            <button type="button" class="ml-auto btn btn-outline-secondary waves-effect" id="addScenarioButton">Add Scenario</button>
+<div class="row">
+    <div class="col-lg-12">
+        <div class="page-title-box d-flex align-items-center">
+            <div>
+                <h4 class="mb-0 font-size-18">SCENARIOS</h4>
+            </div>
+            <div class="ml-auto">
+                <button type="button" class="ml-auto btn btn-outline-secondary waves-effect" id="addScenarioButton">Add Scenario</button>
+            </div>
         </div>
     </div>
 </div>
 
-<div class="col-lg-12">
-    <div class="">
-        <div class="table-responsive">
-            <table id="scenarios" class="table project-list-table table-nowrap table-centered table-borderless">
-                <thead>
-                    <tr>
-                        <th scope="col" style="width: 100px"></th>
-                        <th scope="col">NAME</th>
-                        <th scope="col">DEVICES TYPE</th>
-                        <th scope="col">NUMBER OF DEVICES</th>
-                        <th scope="col">STOP AWS SERVICES?</th>
-                        <th scope="col">STATUS</th>
-                        <th scope="col">ACTION</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var scenario in Model)
-                    {
-                    <tr>
-                        <td><i class="bx bx-list-check" style="font-size: 28px; color: #72BB53;"></i></td>
-                        <td><span class="text-dark scenarioName">@scenario.Name</span></td>
+<div class="row">
 
-                        <td>
-                            <span class="text-dark">@scenario.DevicesType</span>
-                        </td>
-                        <td>
-                            <span class="text-dark">@scenario.DevicesNumber</span>
-                        </td>
-                        <td><span class="text-dark">@(scenario.StopAws ? "YES" : "NO")</span></td>
-                        <td><span class="badge badge-soft-success scenarioStatus" style="font-size: 14px;">@scenario.Status</span></td>
+    <div class="col-lg-12">
+        <div class="">
+            <div class="table-responsive">
+                <table id="scenarios" class="table project-list-table table-nowrap table-centered table-borderless">
+                    <thead>
+                        <tr>
+                            <th scope="col" style="width: 100px"></th>
+                            <th scope="col">NAME</th>
+                            <th scope="col">DEVICES TYPE</th>
+                            <th scope="col">NUMBER OF DEVICES</th>
+                            <th scope="col">STOP AWS SERVICES?</th>
+                            <th scope="col">STATUS</th>
+                            <th scope="col">ACTION</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var scenario in Model)
+                        {
+                            <tr>
+                                <td><i class="bx bx-list-check" style="font-size: 28px; color: #72BB53;"></i></td>
+                                <td><span class="text-dark scenarioName">@scenario.Name</span></td>
 
-                        <td>
-                            <div class="dropdown">
-                                <a href="javascript:void(0);" class="dropdown-toggle card-drop" data-toggle="dropdown" aria-expanded="false">
-                                    <i class="mdi mdi-dots-horizontal font-size-18"></i>
-                                </a>
-                                <div class="dropdown-menu dropdown-menu-right">
-                                    <a class="dropdown-item" href="javascript:void(0);" id="scenarioSettings">Configure</a>
-                                    <a class="dropdown-item" href="javascript:void(0);" id="startScenario">Start</a>
-                                    <a class="dropdown-item" href="javascript:void(0);" id="stopScenario">Stop</a>
-                                </div>
-                            </div>
-                        </td>
-                    </tr>
+                                <td>
+                                    <span class="text-dark">@scenario.DevicesType</span>
+                                </td>
+                                <td>
+                                    <span class="text-dark">@scenario.DevicesNumber</span>
+                                </td>
+                                <td><span class="text-dark">@(scenario.StopAws ? "YES" : "NO")</span></td>
+                                <td><span class="badge badge-soft-success scenarioStatus" style="font-size: 14px;">@scenario.Status</span></td>
+
+                                <td>
+                                    <div class="dropdown">
+                                        <a href="javascript:void(0);" class="dropdown-toggle card-drop" data-toggle="dropdown" aria-expanded="false">
+                                            <i class="mdi mdi-dots-horizontal font-size-18"></i>
+                                        </a>
+                                        <div class="dropdown-menu dropdown-menu-right">
+                                            <a class="dropdown-item" href="javascript:void(0);" id="scenarioSettings">Configure</a>
+                                            <a class="dropdown-item" href="javascript:void(0);" id="startScenario">Start</a>
+                                            <a class="dropdown-item" href="javascript:void(0);" id="stopScenario">Stop</a>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
 
 
-                    }
+                        }
 
-                </tbody>
+                    </tbody>
 
-            </table>
+                </table>
+            </div>
         </div>
     </div>
+
 </div>
 
 <!-- Modal -->

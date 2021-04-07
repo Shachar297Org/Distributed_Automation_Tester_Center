@@ -20,9 +20,9 @@ namespace TestCenterApp.Controllers
     [ApiController]
     public class CenterController : Controller
     {
-        IBackEndInterface _backEnd;
+        ILoadTester _backEnd;
 
-        public CenterController(IBackEndInterface backEnd)
+        public CenterController(ILoadTester backEnd)
         {
             _backEnd = backEnd;
         }

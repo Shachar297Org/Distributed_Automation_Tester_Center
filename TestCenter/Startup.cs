@@ -40,7 +40,7 @@ namespace TestCenter
             services.AddTransient<ITestCenterService, TestCenterService>();
 
             services.AddSingleton<Settings>(x => Settings.GetInstance(Configuration["TestCenter:ConfigPath"]));
-            services.AddSingleton<IBackEndInterface, BackEnd>();
+            services.AddSingleton<ILoadTester, LoadTester>();
 
             //var sp = services.BuildServiceProvider();
             //var settings = sp.GetService<Settings>();

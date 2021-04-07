@@ -262,8 +262,12 @@ connection.on('stageData', function (message) {
     $('#devicesFinished').text(message.devicesNumberFinished);
 
     if (!chartExists && message.time != undefined && message.time != null) {
-        dateToCheck = new Date(message.time)
+        /*dateToCheck = new Date(message.time)
         if (dateToCheck.getFullYear() == 1 && message.stage == 'GET_RESULTS') {
+            return;
+        }*/
+
+        if (!message.isNewStage) {
             return;
         }
 
