@@ -11,7 +11,7 @@ from record import *
 from logger import *
 
 
-def ReadLogFile(logFile: str, columns=None):
+def ReadLogFile(logFile, columns=None):
     """
     Read log file and return records list when each record is a dictionary
     """
@@ -20,7 +20,6 @@ def ReadLogFile(logFile: str, columns=None):
         lines = reader.readlines()
         columnsLine = lines[0].strip('\n\"')
         if columns is None:
-            print('***')
             columns = columnsLine.split(',')
         for line in lines[1:]:
             if len(line) == 0 or line[0] == '\n':
@@ -39,13 +38,34 @@ def GenerateNowTime():
     return datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
 
-def ConvertDatetime(datetimeStr: str, fromFormat: str, toFormat: str):
+def ConvertSQLDatetime(datetimeStr: str):
     """
-    Convert from one datetime format to another
+    Convert SQL datetime to regular datetime
     """
-    dt = datetime.datetime.strptime(datetimeStr, fromFormat)
-    return dt.strftime(toFormat)
+    dt = None
+    try:
+        dt = datetime.datetime.strptime(datetimeStr, '%Y-%m-%dT%H:%M:%S')
+    except ValueError:
+        dt = datetime.datetime.strptime(datetimeStr, '%Y-%m-%dT%H:%M')
+    return dt.strftime('%Y-%m-%d %H:%M:%S')
 
+
+def ConvertDatetimeFromAMPMTo24(datetimeStr: str, fromFormat: str):
+    if datetimeStr.endswith('AM'):
+        dt = datetime.datetime.strptime(datetimeStr, fromFormat)
+        return dt.strftime('%Y-%m-%d %H:%M:%S')
+    elif datetimeStr.endswith('PM'):
+        dt = datetime.datetime.strptime(datetimeStr, fromFormat)
+        hour = dt.hour
+        if hour != 12:
+            hour += 12
+        dt = dt.replace(hour=hour)
+        return dt.strftime('%Y-%m-%d %H:%M:%S')
+    else:
+        #dt = datetime.datetime.strptime(datetimeStr, fromFormat)
+        #return dt.strftime('%Y-%m-%d %H:%M:%S')
+        
+        return datetime.datetime.strptime(datetimeStr, '%d.%m.%Y %H:%M:%S').strftime('%Y-%m-%d %H:%M:%S')
 
 def ReadEventEntriesFromExcelFile(excelFilePath: str, sheetName: str):
     """

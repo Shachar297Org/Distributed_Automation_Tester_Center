@@ -1,0 +1,13 @@
+﻿/* Please see documentation at https://docs.microsoft.com/aspnet/core/client-side/bundling-and-minification
+for details on configuring this project to bundle and minify static web assets. */
+
+body[data-sidebar=dark] .navbar-brand-box {
+    background: #001529;
+}
+
+body[data-sidebar=dark] .vertical-menu {
+    background: #001529;
+}
+
+
+

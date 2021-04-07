@@ -7,6 +7,8 @@ using System.Diagnostics;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using TestCenterConsole.Models;
+using TestCenterConsole.Utilities;
 
 namespace Console.Utilities
 {
@@ -80,25 +82,21 @@ namespace Console.Utilities
             
         }
 
-        private static void Process_ErrorDataReceived(object sender, DataReceivedEventArgs e)
-        {
-            
-        }
 
         /// <summary>
         /// Read agent list from json file
         /// </summary>
         /// <param name="jsonFile">json file</param>
         /// <returns>list of agent objects</returns>
-        public static List<Agent> ReadAgentsFromFile(string agentsFilePath)
+        public static List<AgentData> ReadAgentsFromFile(string agentsFilePath)
         {
-            List<Agent> agentList = null;
+            List<AgentData> agentList = null;
             try
             {
                 using (StreamReader reader = new StreamReader(agentsFilePath))
                 {
                     string json = reader.ReadToEnd();
-                    agentList = JsonConvert.DeserializeObject<List<Agent>>(json);
+                    agentList = JsonConvert.DeserializeObject<List<AgentData>>(json);
                 }
             }
             catch (Exception ex)
@@ -108,7 +106,7 @@ namespace Console.Utilities
             }
             if (agentList == null)
             {
-                agentList = new List<Agent>();
+                agentList = new List<AgentData>();
             }
             return agentList;
         }
@@ -118,7 +116,7 @@ namespace Console.Utilities
         /// </summary>
         /// <param name="list">agent list</param>
         /// <param name="jsonFile">json file</param>
-        public static void WriteAgentListToFile(List<Agent> list, string agentsFilePath)
+        public static void WriteAgentListToFile(List<AgentData> list, string agentsFilePath)
         {
             string jsonObj = JsonConvert.SerializeObject(list);
             WriteToFile(agentsFilePath, jsonObj, append: false);
@@ -163,27 +161,12 @@ namespace Console.Utilities
             
         }
 
-        public static void LoadConfig()
-        {
-            string configFilePath = "D:/Config/test_center_config.txt";
-            using (var streamReader = File.OpenText(configFilePath))
-            {
-                Settings.settingsDict["CONFIG_FILE"] = configFilePath;
-                var lines = streamReader.ReadToEnd().Split("\r\n".ToCharArray(), StringSplitOptions.RemoveEmptyEntries);
-                foreach (string line in lines)
-                {
-                    string[] fields = line.Split('=');
-                    Settings.settingsDict[fields[0]] = fields[1];
-                }
-            }
-        }
-
         public static void WriteLog(string msg, string level)
         {
             _readWriteLock.EnterWriteLock();
             try
             {
-                using (StreamWriter writer = new StreamWriter(Settings.Get("LOG_FILE_PATH"), append: true))
+                using (StreamWriter writer = new StreamWriter(Settings.GetInstance("D:/Config/test_center_config.txt")["LOG_FILE_PATH"], append: true))
                 {
                     string nowTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
                     writer.WriteLine($"{nowTime} [{level.ToUpper()}] : {msg}");
@@ -195,7 +178,7 @@ namespace Console.Utilities
             }               
         }
 
-        public static void WriteRecordsToCsv(string csvFileByDevice, List<Event> events)
+        public static void WriteEventsToCsv(string csvFileByDevice, List<Event> events)
         {
             using (StreamWriter writer = new StreamWriter(csvFileByDevice))
             {
@@ -204,6 +187,18 @@ namespace Console.Utilities
                 {
                     writer.WriteLine($"{e.EventDeviceSerialNumber},{e.EventDeviceType},{e.EventKey},{e.EventValue},{e.CreationTime}");
                 }     
+            }
+        }
+
+        public static void WriteDevicesToCsv(string csvFile, List<LumenisXDevice> devices)
+        {
+            using (StreamWriter writer = new StreamWriter(csvFile))
+            {
+                writer.WriteLine($"deviceType,deviceSerialNumber");
+                foreach (var device in devices)
+                {
+                    writer.WriteLine($"{device.DeviceType},{device.DeviceSerialNumber}");
+                }
             }
         }
     }

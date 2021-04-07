@@ -17,6 +17,8 @@ namespace Shared
 
         Task GetComparisonResults(string url, string jsonContent);
 
+        Task GetComparisonResults(string url, List<Console.Events> events);
+
         Task Init();
 
         string TestCommand(string num);

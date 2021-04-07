@@ -1,0 +1,238 @@
+﻿
+@model TestCenter.ViewModels.TestCenterViewModel
+
+@{
+    ViewBag.Title = "Test Center";
+    ViewBag.pTitle = "Results";
+    ViewBag.pageTitle = "Results";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+
+}
+
+<!-- DataTables -->
+<link href="~/assets/libs/datatables.net-bs4/css/dataTables.bootstrap4.min.css" rel="stylesheet" type="text/css" />
+<link href="~/assets/libs/datatables.net-buttons-bs4/css/buttons.bootstrap4.min.css" rel="stylesheet" type="text/css" />
+<!-- Responsive datatable examples -->
+<link href="~/assets/libs/datatables.net-responsive-bs4/css/responsive.bootstrap4.min.css" rel="stylesheet" type="text/css" />
+
+<div class="col-xl-12">
+    <div class="row">
+
+        <div class="col-md-3">
+            <div class="card mini-stats-wid">
+                <div class="card-body">
+                    <div class="media">
+                        <div class="media-body">
+                            <p class="text-muted font-weight-medium">Total Devices</p>
+                            <h4 class="mb-0" id="progressScenarioName">@(Model.Scenarios.Where(s => s.Status == ScenarioStatus.EXECUTING).Count() != 0 ? Model.Scenarios.Where(s => s.Status == ScenarioStatus.EXECUTING).FirstOrDefault().DevicesNumber : "-")</h4>
+                        </div>
+
+                        <div class="avatar-sm rounded-circle bg-secondary align-self-center mini-stat-icon">
+                            <span class="avatar-title rounded-circle bg-secondary">
+                                <i class="bx bx-copy-alt font-size-24"></i>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card mini-stats-wid">
+                <div class="card-body">
+                    <div class="media">
+                        <div class="media-body">
+                            <p class="text-muted font-weight-medium">Total Events expected</p>
+                            <h4 class="mb-0" id="stage">@(Model.ProgressData.AgentsData.Count > 0 ? Model.ProgressData.AgentsData[0].TotalEvents * Model.Scenarios.Where(s => s.Status == ScenarioStatus.EXECUTING || s.Status == ScenarioStatus.FINISHED).FirstOrDefault().DevicesNumber : "-")</h4>
+                        </div>
+
+                        <div class="mini-stat-icon avatar-sm rounded-circle bg-secondary align-self-center">
+                            <span class="avatar-title bg-secondary">
+                                <i class="bx bx-archive-in font-size-24"></i>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+        <div class="col-md-3">
+            <div class="card mini-stats-wid">
+                <div class="card-body">
+                    <div class="media">
+                        <div class="media-body">
+                            <p class="text-muted font-weight-medium">Devices finished</p>
+                            <h4 class="mb-0" id="devicesFinished">@(Model.ProgressData.StageData.Last().DevicesNumberFinished != 0 ? Model.ProgressData.StageData.Last().DevicesNumberFinished : "-") </h4>
+                        </div>
+
+                        <div class="avatar-sm rounded-circle bg-secondary align-self-center mini-stat-icon">
+                            <span class="avatar-title rounded-circle bg-secondary">
+                                <i class="bx bxs-devices font-size-24"></i>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card mini-stats-wid">
+                <div class="card-body">
+                    <div class="media">
+                        <div class="media-body">
+                            <p class="text-muted font-weight-medium">Events in RDS</p>
+                            <h4 class="mb-0" id="eventsInRds">@(Model.ProgressData.AwsMetricsData.Count != 0 ? Model.ProgressData.AwsMetricsData.Last().EventsInRDS : "-")</h4>
+                        </div>
+
+                        <div class="avatar-sm rounded-circle bg-secondary align-self-center mini-stat-icon">
+                            <span class="avatar-title rounded-circle bg-secondary">
+                                <i class="bx bxs-check-circle font-size-24"></i>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+    <!-- end row -->
+
+</div>
+
+@foreach (var agent in Model.Agents)
+{
+<div class="row">
+    <div class="col-lg-12">
+        <div class="card">
+            <div class="card-body">
+                <h4 class="card-title mb-4">Agent @agent.Name</h4>
+                <div class="mb-2"><span>@agent.IPAddress:@agent.Port</span></div>
+                <div class="table-responsive">
+                    <table class="table table-bordered dt-responsive nowrap dataTable no-footer dtr-inline agent-datatable">
+                        <thead class="thead-light">
+                            <tr>
+
+                                <th>Device Serial Number</th>
+                                <th>Device Type</th>
+                                <th>Total Events</th>
+                                <th>Events in RDS</th>
+                                <th>Finished</th>
+                                <th>Success</th>
+                                <th>Script Log</th>
+
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @{
+                                    var url = agent.URL.Split('/')[2];
+                                    var agentData = Model.ProgressData.AgentsData.Where(a => a.URL == url).FirstOrDefault();
+                                    if (agentData != null)
+                                    {
+                                        foreach (var device in agentData.Devices)
+                                        {
+
+                                <tr>
+
+                                    <td>@device.DeviceSerialNumber</td>
+                                    <td>@device.DeviceType</td>
+                                    <td>
+                                        @agentData.TotalEvents
+                                    </td>
+                                    <td>
+                                        @device.EventsInRDS
+                                    </td>
+                                    <td>
+                                        <span class="badge badge-pill @(device.Finished ? "badge-soft-success" : "badge-soft-danger") font-size-12">@(device.Finished ? "YES" : "NO")</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge badge-pill @(agentData.TotalEvents == device.EventsInRDS && device.Finished && device.Success ? "badge-soft-success" : "badge-soft-danger") font-size-12">@(agentData.TotalEvents == device.EventsInRDS && device.Finished && device.Success)</span>
+                                    </td>
+                                    <td>
+                                        <!-- Button trigger modal -->
+                                        <button type="button" class="btn btn-outline-primary btn-sm btn-rounded waves-effect waves-light" onclick="openLogModal('@device.DeviceSerialNumber', '@device.DeviceType')">
+                                            View Script Log
+                                        </button>
+                                    </td>
+                                </tr>
+                                        }
+                                    }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <!-- end table-responsive -->
+            </div>
+        </div>
+    </div>
+</div>
+
+}
+
+<!-- Modal -->
+<div class="modal fade scriptLogModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="exampleModalLabel">Script Log</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+
+                <code id="log">No data</code>
+
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- end modal -->
+<!-- JAVASCRIPT -->
+<script src="~/assets/libs/jquery/jquery.min.js"></script>
+<script src="~/assets/libs/bootstrap/js/bootstrap.bundle.min.js"></script>
+<script src="~/assets/libs/metismenu/metisMenu.min.js"></script>
+<script src="~/assets/libs/simplebar/simplebar.min.js"></script>
+<script src="~/assets/libs/node-waves/waves.min.js"></script>
+<script src="~/assets/js/lang/jquery.multiLanguage.js"></script>
+
+<!-- Required datatable js -->
+<script src="~/assets/libs/datatables.net/js/jquery.dataTables.min.js"></script>
+<script src="~/assets/libs/datatables.net-bs4/js/dataTables.bootstrap4.min.js"></script>
+<!-- Buttons examples -->
+<script src="~/assets/libs/datatables.net-buttons/js/dataTables.buttons.min.js"></script>
+<script src="~/assets/libs/datatables.net-buttons-bs4/js/buttons.bootstrap4.min.js"></script>
+<script src="~/assets/libs/jszip/jszip.min.js"></script>
+<script src="~/assets/libs/pdfmake/build/pdfmake.min.js"></script>
+<script src="~/assets/libs/pdfmake/build/vfs_fonts.js"></script>
+<script src="~/assets/libs/datatables.net-buttons/js/buttons.html5.min.js"></script>
+<script src="~/assets/libs/datatables.net-buttons/js/buttons.print.min.js"></script>
+<script src="~/assets/libs/datatables.net-buttons/js/buttons.colVis.min.js"></script>
+
+<!-- Responsive examples -->
+<script src="~/assets/libs/datatables.net-responsive/js/dataTables.responsive.min.js"></script>
+<script src="~/assets/libs/datatables.net-responsive-bs4/js/responsive.bootstrap4.min.js"></script>
+
+
+<script type="text/javascript">
+    $(document).ready(function () {
+        $(".agent-datatable").DataTable()
+    });
+
+    function openLogModal(deviceName, deviceType) {
+
+        var device = deviceName + '_' + deviceType;
+        $.get("/ui/GetScriptLog?device=" + device,
+            function (data) {
+                if (data != "") {
+                    $(".scriptLogModal #log").html(data);
+                }
+            });
+
+
+        $('.scriptLogModal').modal('show');
+    }
+
+</script>

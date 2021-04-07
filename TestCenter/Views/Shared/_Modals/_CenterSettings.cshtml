@@ -1,0 +1,38 @@
+﻿@model TestCenter.ViewModels.TestCenterViewModel
+
+
+<form asp-action="SetSettings" asp-controller="UI" method="post">
+
+    @Html.AntiForgeryToken()
+    <div class="form-group">
+        <label asp-for="Environment" for="formrow-inputEnv">Environment</label>
+        <select asp-for="Environment" asp-items="Html.GetEnumSelectList<TestCenterConsole.Models.BiotEnvironment>()" id="formrow-inputEnv" class="form-control">
+        </select>
+    </div>
+
+
+    <div class="form-group">
+        <label for="formrow-inputLog">Log File Path</label>
+        <input asp-for="@Model.LogFilePath" type="text" class="form-control" id="formrow-inputLog">
+    </div>
+
+    <div class="form-group">
+        <label for="formrow-inputResults">Results Folder</label>
+        <input asp-for="@Model.ResultsFolder" type="text" class="form-control" id="formrow-inputResults">
+    </div>
+
+    <div class="form-group">
+        <label for="formrow-inputScripts">Scripts Results Folder</label>
+        <input asp-for="@Model.ScriptResultsFolder" type="text" class="form-control" id="formrow-inputScripts">
+    </div>
+
+    <div>
+        <button type="submit" class="btn btn-outline-primary w-md">Submit</button>
+    </div>
+
+</form>
+
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+}

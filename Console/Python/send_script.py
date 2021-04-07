@@ -4,7 +4,7 @@ def SendScriptToAgent(agentRec: dict, scriptContent: str, delayBeforeStoppingSer
     print(
         'Sending activation script to agent {}'.format(agentRec['URL']), 'info')
     r = requests.post(
-        url='http://{}:{}/sendScript'.format(agentRec['AgentIP'], agentRec['AgentPort']), json={'Type': 'txt', 'Content': scriptContent, 'StoppingDelay' : delayBeforeStoppingServer})
+        url='http://{}/sendScript'.format(agentRec['URL']), json={'Type': 'txt', 'Content': scriptContent, 'StoppingDelay' : delayBeforeStoppingServer})
     if r.status_code == 200:
         print('Script was recieved at agent {}'.format(
             agentRec['URL']), 'info')
@@ -16,10 +16,6 @@ def SendScriptToAgents(agentRecords: list, scriptContent: str, delayBeforeStoppi
     from joblib import Parallel, delayed
 
     res = Parallel(n_jobs=len(agentRecords))(delayed(SendScriptToAgent)(agentRec, scriptContent, delayBeforeStoppingServer) for agentRec in agentRecords)
-
-    #for agentRec in agentRecords:
-    #    if agentRec['IsReady']:
-    #        SendScriptToAgent(agentRec, scriptContent, delayBeforeStoppingServer)
 
 
 if __name__ == "__main__":
@@ -46,8 +42,8 @@ if __name__ == "__main__":
         scriptFile = config['ACTIVATION_SCRIPT_PATH']
         delayBeforeStoppingServer = 0
 
-        if int(config['SCENARIO']) == 2:
-            delayBeforeStoppingServer = 2*int(config['MINUTES_TO_KEEP_STOPPED'])
+        if config['SCENARIO_STOP_AWS'].lower() == 'true':
+            delayBeforeStoppingServer = 2*int(config['SCENARIO_MINUTES_TO_KEEP_STOPPED'])
 
         agentRecords = ReadRecordsFromJsonFile(agentsFile)
         scriptContent = ReadContentFromFile(scriptFile)
