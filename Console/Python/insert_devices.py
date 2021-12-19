@@ -46,6 +46,7 @@ def CollectDevicesFromPortalByAPI(config: object, limit=0, page=0, searchQuery='
     print('Login success. ')
 
     response = None
+    devices = []
 
     if limit == 0 and page == 0:
         host = config['API_GET_DEVICES_URL'] + \
@@ -59,12 +60,36 @@ def CollectDevicesFromPortalByAPI(config: object, limit=0, page=0, searchQuery='
         if response.ok:
             totalResults = response.json()['metadata']['page']['totalResults']
             print("total: {}".format(totalResults))
-            host = config['API_GET_DEVICES_URL'] + \
-                '?limit={}&page=0&search={}'.format(totalResults, searchQuery)
 
-            print('host: {}'.format(host))
-            response = requests.get(url=host, headers={'Content-Type': 'application/json', 'Authorization': 'Bearer {}'.format(
-                accessToken)})
+            if totalResults < 500:
+                host = config['API_GET_DEVICES_URL'] + \
+                    '?limit={}&page=0&search={}'.format(totalResults, searchQuery)
+
+                print('host: {}'.format(host))
+                response = requests.get(url=host, headers={'Content-Type': 'application/json', 'Authorization': 'Bearer {}'.format(
+                    accessToken)})
+
+                for device_json in response.json()['data']:
+                    device = device_json['deviceInfo']
+                    devices.append(
+                        {'deviceType': device['deviceType'], 'deviceSerialNumber': device['deviceSerialNumber']})
+            else:
+                index = 0
+                while totalResults > 0:
+                    host = config['API_GET_DEVICES_URL'] + \
+                        '?limit={}&page={}&search={}'.format(500, index, searchQuery)
+
+                    print('host: {}'.format(host))
+                    response = requests.get(url=host, headers={'Content-Type': 'application/json', 'Authorization': 'Bearer {}'.format(
+                        accessToken)})
+
+                    for device_json in response.json()['data']:
+                        device = device_json['deviceInfo']
+                        devices.append(
+                            {'deviceType': device['deviceType'], 'deviceSerialNumber': device['deviceSerialNumber']})
+
+                    index = index + 1
+                    totalResults = totalResults - 500
     else:
         host = config['API_GET_DEVICES_URL'] + \
             '?limit={0}&page={1}&search={2}'.format(limit, page, searchQuery)
@@ -73,17 +98,19 @@ def CollectDevicesFromPortalByAPI(config: object, limit=0, page=0, searchQuery='
         response = requests.get(url=host, headers={'Content-Type': 'application/json', 'Authorization': 'Bearer {}'.format(
             accessToken)})
 
+        for device_json in response.json()['data']:
+            device = device_json['deviceInfo']
+            devices.append(
+                {'deviceType': device['deviceType'], 'deviceSerialNumber': device['deviceSerialNumber']})
+
     if response and response.ok:
         print('Devices were retrieved successfully.')
     else:
         print('Error: cannot retrieve the devices. status code: {}. {}'.format(
             response.status_code, response.text))
+    
 
-    devices = []
-    for device_json in response.json()['data']:
-        device = device_json['deviceInfo']
-        devices.append(
-            {'deviceType': device['deviceType'], 'deviceSerialNumber': device['deviceSerialNumber']})
+    print('Number of devices collected: {}'.format(len(devices)))
 
     return devices, accessToken
 
@@ -139,6 +166,9 @@ def InsertDevices(accessToken: str, env: str, deviceRecords: dict, config: objec
     """
     Insert new devices from csv file to portal
     """
+
+    from joblib import Parallel, delayed
+
     #accessToken = SendRequestLogin(config)
     rdsSim = True if config['RDS_SIMUL'] == 'True' else False
     if rdsSim:
@@ -148,9 +178,11 @@ def InsertDevices(accessToken: str, env: str, deviceRecords: dict, config: objec
         print('Error: Login failed.')
         return
     print('Login success.')
-    for deviceRecord in deviceRecords:
-        print('Inserting device: {}'.format(deviceRecord))
-        InsertDevice(accessToken, deviceRecord, config)
+    Parallel(n_jobs=10)(delayed(InsertDevice)(accessToken, deviceRecord, config) for deviceRecord in deviceRecords)
+    
+    #for deviceRecord in deviceRecords:
+    #    print('Inserting device: {}'.format(deviceRecord))
+    #    InsertDevice(accessToken, deviceRecord, config)
 
 
 if __name__ == "__main__":
