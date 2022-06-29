@@ -319,9 +319,16 @@ namespace TestCenterApp.Controllers
         
         public async Task<IActionResult> StopScenario([FromQuery]string action)
         {
-            _model.Scenarios.Where(sc => sc.Status == ScenarioStatus.EXECUTING).FirstOrDefault().Status = ScenarioStatus.FINISHED;
+            var runningScenario = _model.Scenarios.Where(sc => sc.Status == ScenarioStatus.EXECUTING).FirstOrDefault();
+            if (runningScenario != null)
+            {
+                runningScenario.Status = ScenarioStatus.FINISHED;
+            }
+            else
+            {
+                return Ok();
+            }
 
-            
             foreach (var agentProgress in _model.ProgressData.AgentsData)
             {
                 agentProgress.Status = AgentStatus.FINISHED.ToString();
