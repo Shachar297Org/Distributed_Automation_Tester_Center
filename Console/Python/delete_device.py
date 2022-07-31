@@ -23,7 +23,8 @@ def SendRequestLogin(config: object):
 
 def DeleteDevices(accessToken: str, devicesList, config: object):
     for device in devicesList:
-        DeleteDevice(accessToken, device['deviceSerialNumber'], device['deviceType'], config)
+        #print("Deleting device {0} {1}".format(device['deviceSerialNumber'], device['deviceType']))
+        accessToken = DeleteDevice(accessToken, device['deviceSerialNumber'], device['deviceType'], config)
 
 
 def DeleteDevice(accessToken: str, deviceSerialNumber: str, deviceType: str, config: object):
@@ -40,11 +41,18 @@ def DeleteDevice(accessToken: str, deviceSerialNumber: str, deviceType: str, con
     response = requests.delete(url=host, headers={'Content-Type': 'application/json', 'Authorization': 'Bearer {}'.format(
         accessToken)})
     if response.ok:
-        print('Device {} was deleted successfully.'.format(deviceName))
-
+        #print('Device {} was deleted successfully.'.format(deviceName))
+        return accessToken
     else:
         print('Error: cannot delete device {}. status code: {}. {}'.format(
             deviceName, response.status_code, response.text))
+        if response.status_code == "TOKEN_NOT_VALID":
+            accessToken = SendRequestLogin(config)
+
+            response = requests.delete(url=host, headers={'Content-Type': 'application/json', 'Authorization': 'Bearer {}'.format(
+                accessToken)})
+    
+    return accessToken
     
 
 def DeleteDeviceData(accessToken: str, deviceSerialNumber: str, deviceType: str, config: object, dataType: str, fromDate: str, toDate: str):

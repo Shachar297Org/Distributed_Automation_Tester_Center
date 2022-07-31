@@ -34,6 +34,7 @@ namespace Console.Interfaces
         void Stop();
 
         string GetScriptLog(string deviceName);
+        List<AgentData> GetAgentData();
 
     }
 }

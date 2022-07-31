@@ -99,140 +99,174 @@
 
 </div>
 
-@foreach (var agent in Model.Agents)
-{
-<div class="row">
-    <div class="col-lg-12">
-        <div class="card">
-            <div class="card-body">
-                <h4 class="card-title mb-4">Agent @agent.Name</h4>
-                <div class="mb-2"><span>@agent.IPAddress:@agent.Port</span></div>
-                <div class="table-responsive">
-                    <table class="table table-bordered dt-responsive nowrap dataTable no-footer dtr-inline agent-datatable">
-                        <thead class="thead-light">
-                            <tr>
 
-                                <th>Device Serial Number</th>
-                                <th>Device Type</th>
-                                <th>Total Events</th>
-                                <th>Events in RDS</th>
-                                <th>Finished</th>
-                                <th>Success</th>
-                                <th>Script Log</th>
+<div class="col-xl-12">
+    <div class="row">
+        <div class="col-md-2">
+            <div class="card mini-stats-wid">
+                <div class="card-body">
+                    <div class="media">
+                        
 
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @{
-                                    var url = agent.URL.Split('/')[2];
-                                    var agentData = Model.ProgressData.AgentsData.Where(a => a.URL == url).FirstOrDefault();
-                                    if (agentData != null)
-                                    {
-                                        foreach (var device in agentData.Devices)
-                                        {
-
-                                <tr>
-
-                                    <td>@device.DeviceSerialNumber</td>
-                                    <td>@device.DeviceType</td>
-                                    <td>
-                                        @agentData.TotalEvents
-                                    </td>
-                                    <td>
-                                        @device.EventsInRDS
-                                    </td>
-                                    <td>
-                                        <span class="badge badge-pill @(device.Finished ? "badge-soft-success" : "badge-soft-danger") font-size-12">@(device.Finished ? "YES" : "NO")</span>
-                                    </td>
-                                    <td>
-                                        <span class="badge badge-pill @(agentData.TotalEvents == device.EventsInRDS && device.Finished && device.Success ? "badge-soft-success" : "badge-soft-danger") font-size-12">@(agentData.TotalEvents == device.EventsInRDS && device.Finished && device.Success)</span>
-                                    </td>
-                                    <td>
-                                        <!-- Button trigger modal -->
-                                        <button type="button" class="btn btn-outline-primary btn-sm btn-rounded waves-effect waves-light" onclick="openLogModal('@device.DeviceSerialNumber', '@device.DeviceType')">
-                                            View Script Log
-                                        </button>
-                                    </td>
-                                </tr>
-                                        }
-                                    }
+                        @{Html.BeginForm("DownloadReport", "UI", FormMethod.Get);
+                            {
+                                <div class="media-body text-center">
+                                    <input type="submit" value="Download PDF Report" class="ml-auto btn btn-outline-secondary waves-effect" />
+                                </div>
                             }
-                        </tbody>
-                    </table>
+                            Html.EndForm();
+                        }
+                    </div>
                 </div>
-                <!-- end table-responsive -->
             </div>
         </div>
     </div>
 </div>
 
-}
+        @foreach (var agent in Model.Agents)
+        {
+            <div class="row">
+                <div class="col-lg-12">
+                    <div class="card">
+                        <div class="card-body">
+                            <h4 class="card-title mb-4">Agent @agent.Name</h4>
+                            <div class="mb-2"><span>@agent.IPAddress:@agent.Port</span></div>
+                            <div class="table-responsive">
+                                <table class="table table-bordered dt-responsive nowrap dataTable no-footer dtr-inline agent-datatable">
+                                    <thead class="thead-light">
+                                        <tr>
 
-<!-- Modal -->
-<div class="modal fade scriptLogModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-xl" role="document">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="exampleModalLabel">Script Log</h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
+                                            <th>Device Serial Number</th>
+                                            <th>Device Type</th>
+                                            <th>Total Events</th>
+                                            <th>Events in RDS</th>
+                                            <th>Finished</th>
+                                            <th>Success</th>
+                                            <th>Script Log</th>
+
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @{
+                                            var url = agent.URL.Split('/')[2];
+                                            var agentData = Model.ProgressData.AgentsData.Where(a => a.URL == url).FirstOrDefault();
+                                            if (agentData != null)
+                                            {
+                                                foreach (var device in agentData.Devices)
+                                                {
+
+                                                    <tr>
+
+                                                        <td>@device.DeviceSerialNumber</td>
+                                                        <td>@device.DeviceType</td>
+                                                        <td>
+                                                            @agentData.TotalEvents
+                                                        </td>
+                                                        <td>
+                                                            @device.EventsInRDS
+                                                        </td>
+                                                        <td>
+                                                            <span class="badge badge-pill @(device.Finished ? "badge-soft-success" : "badge-soft-danger") font-size-12">@(device.Finished ? "YES" : "NO")</span>
+                                                        </td>
+                                                        <td>
+                                                            <span class="badge badge-pill @(agentData.TotalEvents == device.EventsInRDS && device.Finished && device.Success ? "badge-soft-success" : "badge-soft-danger") font-size-12">@(agentData.TotalEvents == device.EventsInRDS && device.Finished && device.Success)</span>
+                                                        </td>
+                                                        <td>
+                                                            <!-- Button trigger modal -->
+                                                            <button type="button" class="btn btn-outline-primary btn-sm btn-rounded waves-effect waves-light" onclick="openLogModal('@device.DeviceSerialNumber', '@device.DeviceType')">
+                                                                View Script Log
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                }
+                                            }
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                            <!-- end table-responsive -->
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div class="modal-body">
 
-                <code id="log">No data</code>
+        }
 
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+        <!-- Modal -->
+        <div class="modal fade scriptLogModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-xl" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="exampleModalLabel">Script Log</h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+
+                        <code id="log">No data</code>
+
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                    </div>
+                </div>
             </div>
         </div>
-    </div>
-</div>
-<!-- end modal -->
-<!-- JAVASCRIPT -->
-<script src="~/assets/libs/jquery/jquery.min.js"></script>
-<script src="~/assets/libs/bootstrap/js/bootstrap.bundle.min.js"></script>
-<script src="~/assets/libs/metismenu/metisMenu.min.js"></script>
-<script src="~/assets/libs/simplebar/simplebar.min.js"></script>
-<script src="~/assets/libs/node-waves/waves.min.js"></script>
-<script src="~/assets/js/lang/jquery.multiLanguage.js"></script>
+        <!-- end modal -->
+        <!-- JAVASCRIPT -->
+        <script src="~/assets/libs/jquery/jquery.min.js"></script>
+        <script src="~/assets/libs/bootstrap/js/bootstrap.bundle.min.js"></script>
+        <script src="~/assets/libs/metismenu/metisMenu.min.js"></script>
+        <script src="~/assets/libs/simplebar/simplebar.min.js"></script>
+        <script src="~/assets/libs/node-waves/waves.min.js"></script>
+        <script src="~/assets/js/lang/jquery.multiLanguage.js"></script>
 
-<!-- Required datatable js -->
-<script src="~/assets/libs/datatables.net/js/jquery.dataTables.min.js"></script>
-<script src="~/assets/libs/datatables.net-bs4/js/dataTables.bootstrap4.min.js"></script>
-<!-- Buttons examples -->
-<script src="~/assets/libs/datatables.net-buttons/js/dataTables.buttons.min.js"></script>
-<script src="~/assets/libs/datatables.net-buttons-bs4/js/buttons.bootstrap4.min.js"></script>
-<script src="~/assets/libs/jszip/jszip.min.js"></script>
-<script src="~/assets/libs/pdfmake/build/pdfmake.min.js"></script>
-<script src="~/assets/libs/pdfmake/build/vfs_fonts.js"></script>
-<script src="~/assets/libs/datatables.net-buttons/js/buttons.html5.min.js"></script>
-<script src="~/assets/libs/datatables.net-buttons/js/buttons.print.min.js"></script>
-<script src="~/assets/libs/datatables.net-buttons/js/buttons.colVis.min.js"></script>
+        <!-- Required datatable js -->
+        <script src="~/assets/libs/datatables.net/js/jquery.dataTables.min.js"></script>
+        <script src="~/assets/libs/datatables.net-bs4/js/dataTables.bootstrap4.min.js"></script>
+        <!-- Buttons examples -->
+        <script src="~/assets/libs/datatables.net-buttons/js/dataTables.buttons.min.js"></script>
+        <script src="~/assets/libs/datatables.net-buttons-bs4/js/buttons.bootstrap4.min.js"></script>
+        <script src="~/assets/libs/jszip/jszip.min.js"></script>
+        <script src="~/assets/libs/pdfmake/build/pdfmake.min.js"></script>
+        <script src="~/assets/libs/pdfmake/build/vfs_fonts.js"></script>
+        <script src="~/assets/libs/datatables.net-buttons/js/buttons.html5.min.js"></script>
+        <script src="~/assets/libs/datatables.net-buttons/js/buttons.print.min.js"></script>
+        <script src="~/assets/libs/datatables.net-buttons/js/buttons.colVis.min.js"></script>
 
-<!-- Responsive examples -->
-<script src="~/assets/libs/datatables.net-responsive/js/dataTables.responsive.min.js"></script>
-<script src="~/assets/libs/datatables.net-responsive-bs4/js/responsive.bootstrap4.min.js"></script>
+        <!-- Responsive examples -->
+        <script src="~/assets/libs/datatables.net-responsive/js/dataTables.responsive.min.js"></script>
+        <script src="~/assets/libs/datatables.net-responsive-bs4/js/responsive.bootstrap4.min.js"></script>
+        
+        <script type="text/javascript">
+            $(document).ready(function () {
+                $(".agent-datatable").DataTable()
 
 
-<script type="text/javascript">
-    $(document).ready(function () {
-        $(".agent-datatable").DataTable()
-    });
+                $('#downloadReport').on('click', function () {
 
-    function openLogModal(deviceName, deviceType) {
+                    $.get("/ui/DownloadReport");
+                    //,
+                    //function (data) {
+                    //window.location.reload(true);
+                    //});
 
-        var device = deviceName + '_' + deviceType;
-        $.get("/ui/GetScriptLog?device=" + device,
-            function (data) {
-                if (data != "") {
-                    $(".scriptLogModal #log").html(data);
-                }
+                });
             });
 
+            function openLogModal(deviceName, deviceType) {
 
-        $('.scriptLogModal').modal('show');
-    }
+                var device = deviceName + '_' + deviceType;
+                $.get("/ui/GetScriptLog?device=" + device,
+                    function (data) {
+                        if (data != "") {
+                            $(".scriptLogModal #log").html(data);
+                        }
+                    });
 
-</script>
+
+                $('.scriptLogModal').modal('show');
+            }
+
+        </script>

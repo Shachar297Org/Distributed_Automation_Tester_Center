@@ -225,9 +225,6 @@ if __name__ == "__main__":
         print('Devices csv file: {}'.format(devicesCsvFile))
         print('Env: {}'.format(env))
 
-        portalDeviceRecords, accessToken = CollectDevicesFromPortalByAPI(
-            config)
-
         #print('Devices: {}'.format(portalDeviceRecords))
 
         csvDeviceRecords = ReadRecordsFromCsvFile(devicesCsvFile)
@@ -235,6 +232,9 @@ if __name__ == "__main__":
         if strategy == 'intersect':
             # insert missing from csv
             # delete not needed devices on aws
+
+            portalDeviceRecords, accessToken = CollectDevicesFromPortalByAPI(
+            config)
 
             deltaDevicesCsv = GetDeltaDevices(
                 csvDeviceRecords, portalDeviceRecords)
@@ -253,12 +253,18 @@ if __name__ == "__main__":
             # delete all from aws
             # insert all from csv
 
+            portalDeviceRecords, accessToken = CollectDevicesFromPortalByAPI(
+            config)
+
             DeleteDevices(accessToken, portalDeviceRecords, config)
             InsertDevices(accessToken, env, csvDeviceRecords, config)
 
             pass
         elif strategy == 'union':
             # insert missing from csv
+
+            portalDeviceRecords = []
+            accessToken = SendRequestLogin(config)
 
             deltaDevicesCsv = GetDeltaDevices(
                 csvDeviceRecords, portalDeviceRecords)

@@ -33,8 +33,6 @@ namespace Console
         private static System.Timers.Timer _getAWSResourcesTimer = new System.Timers.Timer(new TimeSpan(0, 2, 0).TotalMilliseconds);
         private static System.Timers.Timer _stopECSTaskTimer = new System.Timers.Timer(new TimeSpan(0, 1, 0).TotalMilliseconds);
 
-
-
         private static HashSet<LumenisXDevice> _devices = new HashSet<LumenisXDevice>();
 
         private static List<AgentData> _agentsData = new List<AgentData>();
@@ -127,6 +125,11 @@ namespace Console
                 AgentDataUpdated(this, data); // trigger the event
         }
 
+        public List<AgentData> GetAgentData()
+        {
+            return _agentsData;
+        } 
+
 
         /// <summary>
         /// Initialize backend:
@@ -208,12 +211,6 @@ namespace Console
 
                     TriggerStageDataUpdate(_stageData);
                 }
-
-
-
-
-
-
 
             }
         }
@@ -607,7 +604,6 @@ namespace Console
 
         public async Task GetComparisonResults(string url, EventsLog eventsLog)
         {
-
             try
             {
 
@@ -875,11 +871,11 @@ namespace Console
         {
             try
             {
-                Utils.WriteLog($"Deleting device from portal.", "info");
+                Utils.WriteLog($"Deleting device {deviceSerialNumber} {deviceType} from portal.", "info");
                 
                 string pythonScriptsFolder = Settings["PYTHON_SCRIPTS_PATH"];
                 string pythonExePath = Settings["PYTHON"];
-                Utils.WriteLog($"Python exe path: {pythonExePath}", "info");
+                //Utils.WriteLog($"Python exe path: {pythonExePath}", "info");
                 int returnCode = Utils.RunCommand(pythonExePath, "delete_device.py", $"{deviceSerialNumber} {deviceType} {configFile}", pythonScriptsFolder, Settings["OUTPUT"]);
                 
             }
@@ -1021,20 +1017,6 @@ namespace Console
                      );
 
                 Utils.WriteLog("---------------------------------------------------------------", "info");
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
                 var awsData = new AwsMetricsData();
                 awsData.CPUUtilization = new AWSData[serviceNames.Length];
@@ -1328,6 +1310,25 @@ namespace Console
             }
         }
 
+        private void DeleteGoodDevices()
+        {
+            var numberOfEventsToSend = _agentsData.FirstOrDefault().TotalEvents;
+
+            foreach (var agentData in _agentsData)
+            {
+                var deviceData = agentData.Devices.Where(d => d.EventsInRDS == numberOfEventsToSend);
+                Parallel.ForEach(deviceData, device =>
+                {
+                    new ParallelOptions
+                    {
+                        MaxDegreeOfParallelism = 4
+                    };
+                    DeleteDeviceFromPortal(device.DeviceSerialNumber, device.DeviceType, Settings["CONFIG_FILE"]);
+                });                
+            }
+
+        }
+
         public void Stop()
         {
             _getAWSResourcesTimer.Stop();
@@ -1343,6 +1344,8 @@ namespace Console
                 _stageData.IsNewStage = true;
                 TriggerStageDataUpdate(_stageData);
             }
+
+            DeleteGoodDevices();
             
         }
     }

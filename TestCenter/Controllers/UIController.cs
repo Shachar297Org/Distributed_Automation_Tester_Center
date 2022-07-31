@@ -17,6 +17,12 @@ using System.Threading.Tasks;
 using Newtonsoft.Json;
 using System.IO;
 using Console.Utilities;
+using Syncfusion.Pdf;
+using Syncfusion.Pdf.Graphics;
+using Syncfusion.Drawing;
+using Syncfusion.Pdf.Grid;
+using Syncfusion.Pdf.Tables;
+using System.Data;
 
 namespace TestCenterApp.Controllers
 {
@@ -301,7 +307,7 @@ namespace TestCenterApp.Controllers
                     var responseString = await response.Content.ReadAsStringAsync();
 
                     var dic = JsonConvert.DeserializeObject<Dictionary<string, string>>(responseString);
-                    agent.AgentDirPath = dic["AgentDirPath"];
+                    agent.AgentDirPath = dic["agentDirPath"];
 
                     isLive = true;
                 }
@@ -314,6 +320,300 @@ namespace TestCenterApp.Controllers
             agent.Status = isLive ? AgentStatus.LIVE : AgentStatus.OFFLINE;
 
             return agent;
+        }
+
+
+        private PdfDocument CreateReport()
+        {
+            //Create a new PDF document.
+            /* PdfDocument document = new PdfDocument();
+
+            //Add a page to the document.
+            PdfPage page = document.Pages.Add();
+
+            //Create PDF graphics for the page.
+            PdfGraphics graphics = page.Graphics;
+
+            //Set the standard font.
+            PdfFont font = new PdfStandardFont(PdfFontFamily.Helvetica, 20);
+
+            //Draw the text.
+            graphics.DrawString("Hello World!", font, PdfBrushes.Black, new PointF(0, 0));
+            
+            return document; */
+
+            var report = new PdfDocument();
+
+            try
+            {
+                //Adds a page.
+                PdfPage page = report.Pages.Add();
+
+                //Create PDF graphics for the page.
+                PdfGraphics graphics = page.Graphics;
+
+                //Set the standard font.
+                PdfFont fontHeader = new PdfStandardFont(PdfFontFamily.Helvetica, 18);
+
+                //Draw the header
+
+                PdfStringFormat headerFormat = new PdfStringFormat() { 
+                    WordWrap = PdfWordWrapType.Word, 
+                    LineLimit = true, 
+                    Alignment = PdfTextAlignment.Center 
+                };
+
+                PdfTextElement headerElement = new PdfTextElement("Scale Test Report") { 
+                    Font = fontHeader, 
+                    Brush = PdfBrushes.Black, 
+                    StringFormat = headerFormat
+                };
+
+                PdfLayoutResult headerResult = headerElement.Draw(page, new RectangleF(0, 10, report.PageSettings.Width, 30));
+
+                //Set the standard font.
+                PdfFont fontTitle = new PdfStandardFont(PdfFontFamily.Helvetica, 12);
+
+                //Draw the header
+
+                PdfStringFormat titleFormat = new PdfStringFormat()
+                {
+                    WordWrap = PdfWordWrapType.Word,
+                    LineLimit = true,
+                    Alignment = PdfTextAlignment.Left
+                };
+
+                var startTime = _model.ProgressData.StageData[1].Time;
+                PdfTextElement startTimeTitleElement = new PdfTextElement($"Test start time: {startTime}")
+                {
+                    Font = new PdfStandardFont(PdfFontFamily.Helvetica, 8),
+                    Brush = PdfBrushes.Black,
+                    StringFormat = titleFormat
+                };
+
+                var bottom = headerResult.Bounds.Top + headerResult.Bounds.Height + 40;
+                PdfLayoutResult startTimeTitleResult = startTimeTitleElement.Draw(page, new RectangleF(0, bottom, report.PageSettings.Width, bottom));
+
+                PdfTextElement generalTitleElement = new PdfTextElement("General data")
+                {
+                    Font = fontTitle,
+                    Brush = PdfBrushes.Black,
+                    StringFormat = titleFormat
+                };
+
+                bottom = startTimeTitleResult.Bounds.Top + startTimeTitleResult.Bounds.Height + 20;
+                PdfLayoutResult generalTitleResult = generalTitleElement.Draw(page, new RectangleF(0, bottom, report.PageSettings.Width, bottom));
+
+                //Create a PdfGrid
+                PdfGrid generalTable = new PdfGrid();
+
+                //Create a DataTable
+                DataTable dataTable = new DataTable();
+
+                //Add columns to the DataTable
+                dataTable.Columns.Add("Scenario name");
+                dataTable.Columns.Add("Devices type");
+                dataTable.Columns.Add("Number of devices");
+                dataTable.Columns.Add("Events per device");
+                dataTable.Columns.Add("Number of agents");
+                dataTable.Columns.Add("Test duration");
+
+                //Add rows to the DataTable
+                var finishedScenario = _model.Scenarios.Where(sc => sc.Status == ScenarioStatus.FINISHED).FirstOrDefault();
+
+                var endTime = _model.ProgressData.StageData.Last().Time;
+
+                var diff = endTime.Subtract(startTime);
+                var res = String.Format("{0}h:{1}m:{2}sec", diff.Hours, diff.Minutes, diff.Seconds);
+                
+                //Adds row.
+                dataTable.Rows.Add(new object[] { finishedScenario.Name, finishedScenario.DevicesType, finishedScenario.DevicesNumber,
+                                        _loadTester.GetAgentData().FirstOrDefault().TotalEvents, _model.Agents.Count, res });
+
+
+                //Assign data source.
+                generalTable.DataSource = dataTable;
+
+                //Create string format for PdfGrid
+                PdfStringFormat format = new PdfStringFormat();
+                format.Alignment = PdfTextAlignment.Center;
+                format.LineAlignment = PdfVerticalAlignment.Bottom;
+
+                //Assign string format for each columns in PdfGrid
+                foreach (PdfGridColumn column in generalTable.Columns)
+                    column.Format = format;
+
+                //Apply a built in style
+                generalTable.ApplyBuiltinStyle(PdfGridBuiltinStyle.GridTable4Accent6);
+
+
+                //Set properties to paginate the grid.
+                PdfGridLayoutFormat layoutFormat = new PdfGridLayoutFormat();
+                layoutFormat.Break = PdfLayoutBreakType.FitPage;
+                layoutFormat.Layout = PdfLayoutType.Paginate;
+
+
+                //Draw grid to the page of PDF document
+                bottom = generalTitleResult.Bounds.Top + generalTitleResult.Bounds.Height + 10;
+                PdfLayoutResult generalTableResult = generalTable.Draw(page, new PointF(0, bottom), layoutFormat);
+
+                PdfTextElement awsTitleElement = new PdfTextElement("Max AWS Services CPU and Memory usages in %")
+                {
+                    Font = fontTitle,
+                    Brush = PdfBrushes.Black,
+                    StringFormat = titleFormat
+                };
+
+                bottom = generalTableResult.Bounds.Top + generalTableResult.Bounds.Height + 20;
+                PdfLayoutResult awsTitleResult = awsTitleElement.Draw(page, new RectangleF(0, bottom, report.PageSettings.Width, bottom));
+
+
+                //var secondPage = report.Pages.Add();
+                //Create a PdfGrid
+                PdfGrid awsDataTable = new PdfGrid();
+
+                //Create a DataTable
+                dataTable = new DataTable();
+
+                dataTable.Columns.Add("Device Service CPU %");
+                dataTable.Columns.Add("Device Service Memory %");
+                dataTable.Columns.Add("Facade Service CPU %");
+                dataTable.Columns.Add("Facade Service Memory %");
+                dataTable.Columns.Add("Processing Service CPU %");
+                dataTable.Columns.Add("Processing Service Memory %");
+
+                dataTable.Rows.Add(new object[] { _model.ProgressData.AwsMetricsData.Max(d => d.CPUUtilization[0].Value),
+                                                     _model.ProgressData.AwsMetricsData.Max(d => d.MemoryUtilization[0].Value),
+                                                     _model.ProgressData.AwsMetricsData.Max(d => d.CPUUtilization[1].Value),
+                                                     _model.ProgressData.AwsMetricsData.Max(d => d.MemoryUtilization[1].Value),
+                                                     _model.ProgressData.AwsMetricsData.Max(d => d.CPUUtilization[2].Value),
+                                                     _model.ProgressData.AwsMetricsData.Max(d => d.MemoryUtilization[2].Value) });
+
+               
+                //Assign data source.
+                awsDataTable.DataSource = dataTable;
+
+                //Assign string format for each columns in PdfGrid
+                foreach (PdfGridColumn column in awsDataTable.Columns)
+                    column.Format = format;
+
+                //Apply a built in style
+                awsDataTable.ApplyBuiltinStyle(PdfGridBuiltinStyle.GridTable4Accent6);
+
+                //Draw grid to the page of PDF document
+                bottom = awsTitleResult.Bounds.Top + awsTitleResult.Bounds.Height + 10;
+                PdfLayoutResult awsTableResult = awsDataTable.Draw(page, new PointF(0, bottom), layoutFormat);
+
+                /* 
+                 * For testing
+                 * 
+                var devicesA = new List<LumenisXDevice>();
+                var devicesB = new List<LumenisXDevice>();
+                for (int i = 0; i < 400; i++)
+                {
+                    var device = new LumenisXDevice("AURA", i.ToString());
+                    device.Finished = true;
+                    device.Success = true;
+                    device.EventsInRDS = 7;
+
+                    if (i % 2 == 0)
+                    {
+                        devicesA.Add(device);
+                    }
+                    else
+                    {
+                        devicesB.Add(device);
+                    }
+                }
+
+                var agentA = new AgentData();
+                agentA.Devices = devicesA;
+
+                var agentB = new AgentData();
+                agentB.Devices = devicesB;                
+
+                _model.ProgressData.AgentsData = new List<AgentData> { agentA, agentB };
+                */
+
+                //Create a DataTable
+                dataTable = new DataTable();
+
+                dataTable.Columns.Add("Device Serial Number");
+                dataTable.Columns.Add("Device Type");
+                dataTable.Columns.Add("Events in RDS");
+
+                bool success = true;
+
+                foreach (var agent in _model.ProgressData.AgentsData)
+                {
+                    var failedDevices = agent.Devices.Where(d => !d.Success);
+
+                    if (failedDevices != null && failedDevices.Count() > 0)
+                    {
+                        foreach (var failedDevice in failedDevices)
+                        {
+                            dataTable.Rows.Add(new object[] { failedDevice.DeviceSerialNumber, failedDevice.DeviceType, failedDevice.EventsInRDS });
+                        }
+
+                        success = false;
+
+                    }
+
+                }
+
+                if (success)
+                {
+                    PdfTextElement successElement = new PdfTextElement("There are no failed devices. The scale test finished successfuly!")
+                    {
+                        Font = fontTitle,
+                        Brush = PdfBrushes.Green,
+                        StringFormat = titleFormat
+                    };
+
+                    bottom = awsTableResult.Bounds.Top + awsTableResult.Bounds.Height + 20;
+                    PdfLayoutResult failedDevicesTitleResult = successElement.Draw(page, new RectangleF(0, bottom, report.PageSettings.Width, bottom));
+
+                }
+                else
+                {
+                    PdfTextElement failedDevicesTitleElement = new PdfTextElement("Failed devices list")
+                    {
+                        Font = fontTitle,
+                        Brush = PdfBrushes.Red,
+                        StringFormat = titleFormat
+                    };
+
+                    bottom = awsTableResult.Bounds.Top + awsTableResult.Bounds.Height + 20;
+                    PdfLayoutResult failedDevicesTitleResult = failedDevicesTitleElement.Draw(page, new RectangleF(0, bottom, report.PageSettings.Width, bottom));
+
+                    bottom = failedDevicesTitleResult.Bounds.Top + failedDevicesTitleResult.Bounds.Height + 10;
+
+                    var faildeAgentTable = new PdfGrid();
+
+                    //Assign data source.
+                    faildeAgentTable.DataSource = dataTable;
+
+                    //Assign string format for each columns in PdfGrid
+                    foreach (PdfGridColumn column in faildeAgentTable.Columns)
+                        column.Format = format;
+
+                    //Apply a built in style
+                    faildeAgentTable.ApplyBuiltinStyle(PdfGridBuiltinStyle.GridTable4Accent6);
+
+                    //Draw grid to the page of PDF document                        
+                    PdfLayoutResult faildeAgentTableResult = faildeAgentTable.Draw(page, new PointF(0, bottom), layoutFormat);
+                }
+
+
+            }
+            catch (Exception ex)
+            {
+                Utils.WriteLog(ex.Message, "error");
+                Utils.WriteLog(ex.StackTrace, "error");
+            }
+
+            return report;
+
         }
 
         
@@ -339,8 +639,7 @@ namespace TestCenterApp.Controllers
                 agentProgress.ClientsNumber = 0;
                 agentProgress.ServersNumber = 0;
             }
-            _loadTester.Stop();
-
+            
 
             foreach (var agent in _model.Agents)
             {
@@ -357,7 +656,7 @@ namespace TestCenterApp.Controllers
                         var responseString = await response.Content.ReadAsStringAsync();
 
                         var dic = JsonConvert.DeserializeObject<Dictionary<string, string>>(responseString);
-                        var result  = bool.Parse(dic["Result"]);
+                        var result  = bool.Parse(dic["result"]);
                         
                         if (result)
                         {
@@ -372,7 +671,35 @@ namespace TestCenterApp.Controllers
                 }
             }
 
+            _loadTester.Stop();
+
             return Ok();
+
+        }
+
+
+        public IActionResult DownloadReport()
+        {
+
+            var report = CreateReport();
+
+            var fileName = $"{_model.ProgressData.ScenarioName}-{_model.Scenarios.Where(sc => sc.Status == ScenarioStatus.FINISHED).FirstOrDefault().DevicesType}.pdf";
+
+            //Creates an instance of memory stream
+            MemoryStream stream = new MemoryStream();
+
+            //Save the document stream
+            report.Save(stream);
+
+            //close the document
+            //report.Close(true);
+
+            // Set the position as '0'.
+            stream.Position = 0;
+
+            //return new FileStreamResult(stream, "application/pdf") { FileDownloadName = fileName };
+            return File(stream, "application/pdf", fileName);
+
         }
 
 
@@ -402,7 +729,7 @@ namespace TestCenterApp.Controllers
                         var responseString = await response.Content.ReadAsStringAsync();
 
                         var dic = JsonConvert.DeserializeObject<Dictionary<string, string>>(responseString);
-                        var res = bool.Parse(dic["Result"]);
+                        var res = bool.Parse(dic["result"]);
 
                         Utils.WriteLog($"Sent init to on agent {agent.Name}", "info");
 
