@@ -39,7 +39,7 @@ def DeleteDevice(accessToken: str, deviceSerialNumber: str, deviceType: str, con
                      deviceType, 'deviceSerialNumbers', deviceSerialNumber])
     #print('host: {}'.format(host))
     response = requests.delete(url=host, headers={'Content-Type': 'application/json', 'Authorization': 'Bearer {}'.format(
-        accessToken)})
+        accessToken)}, timeout=100)
     if response.ok:
         #print('Device {} was deleted successfully.'.format(deviceName))
         return accessToken
@@ -50,7 +50,7 @@ def DeleteDevice(accessToken: str, deviceSerialNumber: str, deviceType: str, con
             accessToken = SendRequestLogin(config)
 
             response = requests.delete(url=host, headers={'Content-Type': 'application/json', 'Authorization': 'Bearer {}'.format(
-                accessToken)})
+                accessToken)}, timeout=100)
     
     return accessToken
     
@@ -75,7 +75,7 @@ def DeleteDeviceData(accessToken: str, deviceSerialNumber: str, deviceType: str,
     print('host: {}'.format(host))
 
     response = requests.delete(url=host, headers={'Content-Type': 'application/json', 'Authorization': 'Bearer {}'.format(
-        accessToken)})
+        accessToken)}, timeout=100)
 
     if response.ok:
         print('{} from {} were deleted successfully.'.format(dataType, deviceName))

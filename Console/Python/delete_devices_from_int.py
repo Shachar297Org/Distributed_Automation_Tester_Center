@@ -1,7 +1,9 @@
-import requests
-import json
 import configparser
+import json
 import traceback
+
+import requests
+
 from utils import *
 
 
@@ -15,14 +17,14 @@ def SendRequestLogin(config: object):
         "password": config['API_PASS']
     }
     response = requests.post(
-        url=loginHost, headers={'Content-Type': 'application/json'}, data=json.dumps(loginData))
+        url=loginHost, headers={'Content-Type': 'application/json'}, data=json.dumps(loginData), timeout=100)
     if not response.ok:
         print('Request failed. status code: {}'.format(response.status_code))
         return None
     jsonObj = response.json()
     return jsonObj['accessToken']
 
-def CollectDevicesFromPortalByAPI(config: object, limit=0, page=0, searchQuery=''):
+def CollectDevicesFromPortalByAPI(config: object, limit=0, page=0, searchQuery='AUTOTESTS-'):
     """
     Collect devices list from the portal by API and return list of their records {GA, SN}
     """
@@ -41,7 +43,7 @@ def CollectDevicesFromPortalByAPI(config: object, limit=0, page=0, searchQuery='
             '?limit=1&page=0&search={}'.format(searchQuery)
 
         response = requests.get(url=host, headers={'Content-Type': 'application/json', 'Authorization': 'Bearer {}'.format(
-            accessToken)})
+            accessToken)}, timeout=100)
 
         totalResults = None
 
@@ -55,7 +57,7 @@ def CollectDevicesFromPortalByAPI(config: object, limit=0, page=0, searchQuery='
 
                 print('host: {}'.format(host))
                 response = requests.get(url=host, headers={'Content-Type': 'application/json', 'Authorization': 'Bearer {}'.format(
-                    accessToken)})
+                    accessToken)}, timeout=100)
 
                 for device_json in response.json()['data']:
                     device = device_json['deviceInfo']
@@ -72,7 +74,7 @@ def CollectDevicesFromPortalByAPI(config: object, limit=0, page=0, searchQuery='
 
                     print('host: {}'.format(host))
                     response = requests.get(url=host, headers={'Content-Type': 'application/json', 'Authorization': 'Bearer {}'.format(
-                        accessToken)})
+                        accessToken)}, timeout=100)
 
                     for device_json in response.json()['data']:
                         device = device_json['deviceInfo']
@@ -90,7 +92,7 @@ def CollectDevicesFromPortalByAPI(config: object, limit=0, page=0, searchQuery='
         print('host: {}'.format(host))
 
         response = requests.get(url=host, headers={'Content-Type': 'application/json', 'Authorization': 'Bearer {}'.format(
-            accessToken)})
+            accessToken)}, timeout=100)
 
         for device_json in response.json()['data']:
             device = device_json['deviceInfo']
@@ -108,10 +110,13 @@ def CollectDevicesFromPortalByAPI(config: object, limit=0, page=0, searchQuery='
 
     return devices, accessToken
 
-from activate_env import *
-from delete_device import DeleteDevices, DeleteDevice
 import re
+
 from joblib import Parallel, delayed
+
+from activate_env import *
+from delete_device import DeleteDevice, DeleteDevices
+
 ActivateEnv()
 #print(re.search("(-\d+)\Z", "AUTOTESTS-08550995-w"))
 
